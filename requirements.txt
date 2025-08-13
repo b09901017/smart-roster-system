@@ -1,0 +1,7 @@
+Flask
+gunicorn
+holidays
+numpy
+openpyxl
+ortools
+pandas

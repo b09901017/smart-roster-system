@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>管理員儀表板</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    <div class="container-fluid">
+        <div class="row">
+            <!-- Sidebar -->
+            <nav class="col-md-3 col-lg-2 d-md-block bg-light sidebar collapse">
+                <div class="position-sticky pt-3 sidebar-sticky">
+                    <h4 class="sidebar-heading px-3 mt-2 mb-3">管理員儀表板</h4>
+                    <div class="px-3 mb-3">
+                        <a href="/" class="btn btn-outline-secondary w-100"><i class="bi bi-arrow-left-circle"></i> 返回首頁</a>
+                    </div>
+                    <hr>
+                    <h6 class="sidebar-heading px-3 mt-4 mb-2 text-muted">排班控制器</h6>
+                    <div class="px-3">
+                        <div class="mb-2">
+                            <label for="admin-year-select" class="form-label">年份</label>
+                            <select id="admin-year-select" class="form-select"></select>
+                        </div>
+                        <div class="mb-3">
+                            <label for="admin-month-select" class="form-label">月份</label>
+                            <select id="admin-month-select" class="form-select"></select>
+                        </div>
+                        <div class="d-grid">
+                            <button id="run-scheduler-btn" class="btn btn-primary btn-lg" disabled>
+                                <i class="bi bi-calculator-fill"></i> 一鍵排班
+                            </button>
+                        </div>
+                        <small id="run-scheduler-help" class="form-text text-muted d-block mt-2">需所有醫師提交預休後方可啟用。</small>
+                    </div>
+                    <hr>
+                    <h6 class="sidebar-heading px-3 mt-4 mb-2 text-muted">
+                        <span id="status-month-title"></span> 預休提交狀態
+                    </h6>
+                    <div id="submission-status-container" class="px-3">
+                        <ul id="submission-status-list" class="list-group list-group-flush">
+                            <!-- JS will populate this -->
+                        </ul>
+                    </div>
+                </div>
+            </nav>
+
+            <!-- Main content -->
+            <main class="col-md-9 col-lg-10 ms-sm-auto px-md-4">
+                <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+                    <h1 class="h2">排班結果</h1>
+                </div>
+
+                <div class="card mb-4">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <span><i class="bi bi-terminal-fill"></i> 即時運算日誌 <span id="log-timer" class="badge bg-secondary ms-2"></span></span>
+                        <button id="toggle-log-btn" class="btn btn-sm btn-outline-secondary d-none">收合/展開</button>
+                    </div>
+                    <div class="card-body" id="log-card-body">
+                        <pre id="log-output" class="log-container bg-dark text-white p-3 rounded">請點擊「一鍵排班」開始運算...</pre>
+                    </div>
+                </div>
+
+                <div id="results-section" class="d-none">
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <h3 class="h4">最終結果</h3>
+                        <div>
+                            <button id="fullscreen-btn" class="btn btn-sm btn-outline-primary me-2"><i class="bi bi-arrows-fullscreen"></i> 全螢幕檢視</button>
+                            <a id="download-excel-btn" href="#" class="btn btn-sm btn-success"><i class="bi bi-file-earmark-excel-fill"></i> 下載 Excel</a>
+                        </div>
+                    </div>
+                    
+                    <ul class="nav nav-pills nav-sm" id="resultTabs" role="tablist">
+                        <li class="nav-item" role="presentation"><button class="nav-link active" id="doctor-schedule-tab" data-bs-toggle="tab" data-bs-target="#doctor-schedule" type="button" role="tab">醫師月曆班表</button></li>
+                        <li class="nav-item" role="presentation"><button class="nav-link" id="area-schedule-tab" data-bs-toggle="tab" data-bs-target="#area-schedule" type="button" role="tab">區域班表</button></li>
+                        <li class="nav-item" role="presentation"><button class="nav-link" id="analysis-tab" data-bs-toggle="tab" data-bs-target="#analysis" type="button" role="tab">結果分析</button></li>
+                        <li class="nav-item" role="presentation"><button class="nav-link" id="points-summary-tab" data-bs-toggle="tab" data-bs-target="#points-summary" type="button" role="tab">點數統計</button></li>
+                    </ul>
+
+                    <div class="tab-content pt-3">
+                        <div class="tab-pane fade show active" id="doctor-schedule" role="tabpanel">
+                             <div class="table-wrapper">
+                                 <div class="card">
+                                     <div class="card-body">
+                                         <div id="schedule-filters" class="d-flex justify-content-end align-items-center mb-3">
+                                             <label class="form-label me-2 mb-0">篩選:</label>
+                                             <select id="area-filter" class="form-select form-select-sm me-2" style="width: 120px;">
+                                                 <option value="all">所有區域</option>
+                                                 <option value="A">A 區</option>
+                                                 <option value="B">B 區</option>
+                                                 <option value="C">C 區</option>
+                                                 <option value="I">I 區</option>
+                                             </select>
+                                             <select id="date-filter" class="form-select form-select-sm me-2" style="width: 150px;">
+                                                 <option value="all">所有日期</option>
+                                                 <option value="1-10">1-10 日</option>
+                                                 <option value="11-20">11-20 日</option>
+                                                 <option value="21-end">21-月底</option>
+                                             </select>
+                                             <button id="reset-filters-btn" class="btn btn-sm btn-outline-secondary">重設</button>
+                                         </div>
+                                         <div id="doctor-schedule-render-area" class="table-responsive"></div>
+                                     </div>
+                                 </div>
+                             </div>
+                        </div>
+                        <div class="tab-pane fade" id="area-schedule" role="tabpanel">
+                            <div class="table-wrapper">
+                                <div id="area-schedule-render-area" class="table-responsive"></div>
+                            </div>
+                        </div>
+                        <div class="tab-pane fade" id="analysis" role="tabpanel">
+                            <div class="analysis-card-wrapper">
+                                <div class="card">
+                                    <div class="card-body">
+                                        <h5 class="card-title">最終解評分指標</h5>
+                                        <ul id="final-scores-list" class="list-group list-group-flush"></ul>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="tab-pane fade" id="points-summary" role="tabpanel">
+                            <div class="table-wrapper">
+                                <div class="table-responsive" id="points-summary-html"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </main>
+        </div>
+    </div>
+
+    <!-- Fullscreen Modal -->
+    <div class="modal fade" id="fullscreen-modal" tabindex="-1">
+        <div class="modal-dialog modal-fullscreen">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">醫師月曆班表 (全螢幕)</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div id="fullscreen-schedule-render-area" class="table-responsive h-100"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+</body>
+</html>

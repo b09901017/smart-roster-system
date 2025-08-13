@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>醫師排休系統</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    <div class="container-fluid">
+        <div class="row">
+            <!-- Sidebar -->
+            <nav class="col-md-3 col-lg-2 d-md-block bg-light sidebar collapse">
+                <div class="position-sticky pt-3">
+                    <h4 class="sidebar-heading px-3 mt-2 mb-3">醫師儀表板</h4>
+                    <div class="px-3 mb-3">
+                        <label for="doctor-select" class="form-label">選擇醫師</label>
+                        <select id="doctor-select" class="form-select">
+                            <option selected disabled>請選擇您的姓名...</option>
+                            {% for doc in doctors %}
+                            <option value="{{ doc }}">{{ doc }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div id="doctor-info-card" class="px-3 d-none">
+                        <div class="card">
+                            <div class="card-body">
+                                <h5 class="card-title" id="info-card-name"></h5>
+                                <p class="card-text mb-1">
+                                    <i class="bi bi-geo-alt-fill"></i> 區域: <span id="info-card-area" class="fw-bold"></span>
+                                </p>
+                                <p class="card-text">
+                                    <i class="bi bi-graph-up"></i> 點數上限: <span id="info-card-points" class="fw-bold"></span>
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                     <hr>
+                    <a href="/" class="btn btn-outline-secondary mx-3"><i class="bi bi-arrow-left-circle"></i> 返回首頁</a>
+                </div>
+            </nav>
+
+            <!-- Main content -->
+            <main class="col-md-9 ms-sm-auto col-lg-10 px-md-4">
+                <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+                    <h1 class="h2">預休日期劃記</h1>
+                </div>
+                
+                <div id="main-content" class="d-none">
+                    <div class="d-flex align-items-center mb-3">
+                        <select id="year-select" class="form-select me-2" style="width: 120px;"></select>
+                        <select id="month-select" class="form-select" style="width: 100px;"></select>
+                    </div>
+                    
+                    <div class="card">
+                        <div class="card-header d-flex justify-content-between align-items-center">
+                            <h5 id="calendar-title" class="mb-0"></h5>
+                            <div>
+                                <span class="badge bg-light text-dark border me-2">可排休</span>
+                                <span class="badge" style="background-color: #FFDDC1; color: #5f3f00;">國定假日</span>
+                                <span class="badge bg-success ms-2">已選定</span>
+                                <span class="badge bg-secondary ms-2">非本月</span>
+                            </div>
+                        </div>
+                        <div class="card-body">
+                            <p class="text-muted"><i class="bi bi-info-circle"></i> 提示：您可以直接在日曆上點擊或拖曳滑鼠來選取多個日期。</p>
+                            <div id="calendar" class="calendar-grid"></div>
+                        </div>
+                        <div class="card-footer text-end">
+                            <button id="submit-schedule" class="btn btn-success"><i class="bi bi-check-circle-fill"></i> 提交本月預休</button>
+                        </div>
+                    </div>
+                </div>
+                <div id="welcome-message" class="text-center p-5">
+                    <h3>請先從左側選擇您的姓名</h3>
+                </div>
+            </main>
+        </div>
+    </div>
+
+    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+</body>
+</html>

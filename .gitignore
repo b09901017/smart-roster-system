@@ -1,0 +1,25 @@
+# Python build artifacts
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Virtual Environments
+.venv
+venv
+ENV
+env
+
+# IDE and editor files
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Locally generated output files
+# 雖然 output 資料夾本身是空的，但忽略裡面的內容是個好習慣
+/output/*.xlsx
+/output/*.pdf
+
+# data.json should be generated on the server, not committed
+data.json
