@@ -9,7 +9,6 @@ document.addEventListener('DOMContentLoaded', function () {
 
 // --- Doctor Page Logic (v2.3.2) ---
 function initDoctorPage() {
-    // --- (程式碼與 V2.3.1 完全相同，此處為求完整性而保留) ---
     const nameInput = document.getElementById('doctor-name-input');
     const loginBtn = document.getElementById('doctor-login-btn');
     const yearSelect = document.getElementById('year-select');
@@ -177,13 +176,12 @@ function initAdminPage() {
     let currentMonth = new Date().getMonth() + 1;
     let eventSource = null, logTimerInterval = null, fullScheduleData = null;
     let doctorTemplate = {};
+    let isFirstLog = true; // 【修復】將 isFirstLog 移至 runScheduler 外部
 
     for (let y = currentYear; y <= currentYear + 2; y++) yearSelect.add(new Option(y, y));
     for (let m = 1; m <= 12; m++) monthSelect.add(new Option(`${m} 月`, m));
     yearSelect.value = currentYear; monthSelect.value = currentMonth;
 
-    // --- 【修復】將 SortableJS 的初始化移至所有按鈕事件綁定之後 ---
-    
     [yearSelect, monthSelect].forEach(el => el.addEventListener('change', () => { currentYear = parseInt(yearSelect.value); currentMonth = parseInt(monthSelect.value); loadDoctorSettings(); runButton.disabled = true; helpText.textContent = '月份已變更，請重新儲存設定。'; }));
     loadTemplateBtn.addEventListener('click', () => { if (confirm("這將會用預設的醫師資料覆蓋目前的醫師設定，確定要載入嗎？")) { loadTemplateData(); } });
     clearMonthBtn.addEventListener('click', async () => { if (confirm(`這將會永久刪除 ${currentYear} 年 ${currentMonth} 月的所有資料，確定要清空嗎？`)) { try { const response = await fetch('/api/clear_month_data', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ year: currentYear, month: currentMonth }) }); const result = await response.json(); alert(result.message); if (result.status === 'success') { loadDoctorSettings(); } } catch (error) { alert('清除資料時發生錯誤。'); } } });
@@ -194,6 +192,7 @@ function initAdminPage() {
     fullscreenBtn.addEventListener('click', () => fullscreenModal.show());
     [areaFilter, dateFilter].forEach(el => el.addEventListener('change', applyTableFilters));
     resetFiltersBtn.addEventListener('click', () => { areaFilter.value = 'all'; dateFilter.value = 'all'; applyTableFilters(); });
+    new Sortable(settingsTbody, { animation: 150, handle: '.drag-handle', onEnd: function (evt) { const movedRow = evt.item, previousRow = movedRow.previousElementSibling, nextRow = movedRow.nextElementSibling; let newArea = null; if (previousRow) { newArea = previousRow.querySelector('.area-select').value; } else if (nextRow) { newArea = nextRow.querySelector('.area-select').value; } if (newArea) { movedRow.querySelector('.area-select').value = newArea; sortSettingsTable(); } } });
 
     async function loadDoctorSettings() {
         settingsMonthTitle.textContent = `${currentYear} 年 ${currentMonth} 月`;
@@ -211,9 +210,6 @@ function initAdminPage() {
             }
         } catch (error) { console.error("Failed to load doctor settings:", error); alert("讀取醫師設定失敗。"); }
     }
-    
-    new Sortable(settingsTbody, { animation: 150, handle: '.drag-handle', onEnd: function (evt) { const movedRow = evt.item, previousRow = movedRow.previousElementSibling, nextRow = movedRow.nextElementSibling; let newArea = null; if (previousRow) { newArea = previousRow.querySelector('.area-select').value; } else if (nextRow) { newArea = nextRow.querySelector('.area-select').value; } if (newArea) { movedRow.querySelector('.area-select').value = newArea; sortSettingsTable(); } } });
-
     function loadTemplateData() { settingsTbody.innerHTML = ''; Object.entries(doctorTemplate).forEach(([name, template]) => { const rowData = { name: name, data: { ...template, submitted: true } }; renderSettingsRow(rowData); }); sortSettingsTable(); alert("預設醫師範本已成功載入！請記得儲存設定。"); }
     function renderSettingsRow({ name, data }) {
         const row = settingsTbody.insertRow();
@@ -244,10 +240,35 @@ function initAdminPage() {
     }
     async function saveDoctorSettings() { const settingsPayload = {}; const rows = settingsTbody.querySelectorAll('tr'); let hasError = false; rows.forEach(row => { const nameInput = row.querySelector('input[type="text"]'); if (!nameInput) return; const name = nameInput.value.trim(); if (!name) { alert('醫師姓名不可為空！'); nameInput.focus(); hasError = true; return; } settingsPayload[name] = { days_off: row.cells[2].textContent.split(',').map(d => parseInt(d.trim())).filter(Number.isInteger), area: row.querySelector('.area-select').value, points_limit: parseInt(row.querySelector('.points-input').value) || 0, submitted: row.querySelector('.bi-check-circle-fill') !== null }; }); if (hasError) return; saveSettingsBtn.disabled = true; saveSettingsBtn.innerHTML = `<span class="spinner-border spinner-border-sm"></span> 儲存中...`; try { const response = await fetch('/api/update_doctor_settings', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ year: currentYear, month: currentMonth, settings: settingsPayload }) }); const result = await response.json(); if (result.status === 'success') { alert('醫師設定已成功儲存！'); runButton.disabled = false; helpText.textContent = '設定已儲存，可以開始排班。'; settingsCollapse.hide(); } else { alert(`儲存失敗：${result.message}`); runButton.disabled = true; helpText.textContent = '儲存失敗，無法排班。'; } } catch (error) { alert('儲存時發生網路錯誤。'); } finally { saveSettingsBtn.disabled = false; saveSettingsBtn.innerHTML = `<i class="bi bi-save-fill"></i> 儲存醫師設定`; } }
     function formatTime(ms) { const seconds = Math.floor(ms / 1000); const m = Math.floor(seconds / 60); const s = seconds % 60; return m > 0 ? `${m}m ${s}s` : `${s}s`; }
-    function runScheduler() { if (eventSource) eventSource.close(); if (logTimerInterval) clearInterval(logTimerInterval); runButton.disabled = true; saveSettingsBtn.disabled = true; runButton.innerHTML = `<span class="spinner-border spinner-border-sm"></span> 運算中...`; logCardBody.classList.remove('minimized'); document.getElementById('log-output').textContent = '正在連接後端排班引擎...'; toggleLogBtn.classList.add('d-none'); resultsSection.classList.add('d-none'); let isFirstLog = true; logTimer.textContent = '0s'; logTimer.classList.remove('bg-success'); logTimer.classList.add('bg-secondary'); const startTime = Date.now(); logTimerInterval = setInterval(() => { logTimer.textContent = formatTime(Date.now() - startTime); }, 1000); const url = `/api/run_scheduler?year=${currentYear}&month=${currentMonth}`; eventSource = new EventSource(url); eventSource.onmessage = e => handleLogMessage(e.data, isFirstLog); eventSource.addEventListener('DONE', e => handleDoneEvent(JSON.parse(e.data), startTime)); eventSource.onerror = () => { document.getElementById('log-output').textContent += '\n與伺服器連線中斷或發生錯誤。'; eventSource.close(); resetRunButton(); }; }
-    let isFirstLog = true;
-    function handleLogMessage(data, first) { const logOutput = document.getElementById('log-output'); if (first) { logOutput.textContent = ''; first = false; } logOutput.textContent += data + '\n'; logOutput.scrollTop = logOutput.scrollHeight; }
-    function handleDoneEvent(data, startTime) { clearInterval(logTimerInterval); logTimer.innerHTML = `✅ ${formatTime(Date.now() - startTime)}`; logTimer.classList.remove('bg-secondary'); logTimer.classList.add('bg-success'); if (data.status === 'success') { fullScheduleData = data.schedule_data_for_render; displayResults(data); logCardBody.classList.add('minimized'); toggleLogBtn.classList.remove('d-none'); setTimeout(() => resultsSection.scrollIntoView({ behavior: 'smooth' }), 100); } else { document.getElementById('log-output').textContent += `\n排班失敗: ${data.message}`; alert(`排班失敗: ${data.message}`); } resetRunButton(); eventSource.close(); }
+    
+    // 【修復】日誌相關函式
+    function handleLogMessage(data) {
+        const logOutput = document.getElementById('log-output');
+        if (isFirstLog) {
+            logOutput.textContent = '';
+            isFirstLog = false;
+        }
+        logOutput.textContent += data + '\n';
+        logOutput.scrollTop = logOutput.scrollHeight;
+    }
+    function runScheduler() {
+        if (eventSource) eventSource.close(); if (logTimerInterval) clearInterval(logTimerInterval);
+        runButton.disabled = true; saveSettingsBtn.disabled = true;
+        runButton.innerHTML = `<span class="spinner-border spinner-border-sm"></span> 運算中...`;
+        logCardBody.classList.remove('minimized');
+        isFirstLog = true; // 重置 isFirstLog 狀態
+        handleLogMessage('正在連接後端排班引擎...');
+        logTimer.textContent = '0s'; logTimer.classList.remove('bg-success'); logTimer.classList.add('bg-secondary');
+        const startTime = Date.now();
+        logTimerInterval = setInterval(() => { logTimer.textContent = formatTime(Date.now() - startTime); }, 1000);
+        const url = `/api/run_scheduler?year=${currentYear}&month=${currentMonth}`;
+        eventSource = new EventSource(url);
+        eventSource.onmessage = e => handleLogMessage(e.data);
+        eventSource.addEventListener('DONE', e => handleDoneEvent(JSON.parse(e.data), startTime));
+        eventSource.onerror = () => { handleLogMessage('\n與伺服器連線中斷或發生錯誤。'); eventSource.close(); resetRunButton(); };
+    }
+    
+    function handleDoneEvent(data, startTime) { clearInterval(logTimerInterval); logTimer.innerHTML = `✅ ${formatTime(Date.now() - startTime)}`; logTimer.classList.remove('bg-secondary'); logTimer.classList.add('bg-success'); if (data.status === 'success') { fullScheduleData = data.schedule_data_for_render; displayResults(data); logCardBody.classList.add('minimized'); toggleLogBtn.classList.remove('d-none'); setTimeout(() => resultsSection.scrollIntoView({ behavior: 'smooth' }), 100); } else { handleLogMessage(`\n排班失敗: ${data.message}`); alert(`排班失敗: ${data.message}`); } resetRunButton(); eventSource.close(); }
     function resetRunButton() { runButton.disabled = false; saveSettingsBtn.disabled = false; runButton.innerHTML = '<i class="bi bi-calculator-fill"></i> 一鍵排班'; }
     function displayResults(data) { resultsSection.classList.remove('d-none'); const scoresList = document.getElementById('final-scores-list'); scoresList.innerHTML = ''; for (const [key, value] of Object.entries(data.final_scores)) { const li = document.createElement('li'); li.classList.add('list-group-item'); const valueClass = key.includes('懲罰') ? (value > 0 ? 'score-penalty' : 'score-bonus') : (key.includes('獎勵') ? (value > 0 ? 'score-bonus' : 'score-penalty') : 'score-neutral'); li.innerHTML = `<span>${key}</span><span class="score-value ${valueClass}">${value}</span>`; scoresList.appendChild(li); } applyTableFilters(); document.getElementById('area-schedule-render-area').innerHTML = data.area_schedule_html; document.getElementById('points-summary-html').innerHTML = data.points_summary_html; const downloadBtn = document.getElementById('download-excel-btn'); downloadBtn.href = data.excel_url; downloadBtn.style.display = 'inline-block'; fullscreenBtn.style.display = 'inline-block'; scheduleFilters.style.display = 'flex'; }
     function applyTableFilters() { if (!fullScheduleData) return; const mainTable = renderScheduleTable(fullScheduleData); document.getElementById('doctor-schedule-render-area').innerHTML = ''; document.getElementById('doctor-schedule-render-area').appendChild(mainTable); const fullscreenContainer = document.getElementById('fullscreen-schedule-render-area'); fullscreenContainer.innerHTML = ''; fullscreenContainer.appendChild(mainTable.cloneNode(true)); }
