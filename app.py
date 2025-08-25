@@ -1,5 +1,5 @@
 # --------------------------------------------------------------------------
-# 智慧排班系統 - Flask 網頁應用程式 (v2.3.1 - 部署錯誤修復)
+# 智慧排班系統 - Flask 網頁應用程式 (v2.3.1 - 穩定版)
 # --------------------------------------------------------------------------
 import os
 import io
@@ -82,9 +82,24 @@ def initialize_doctor_template():
         save_data(DOCTOR_TEMPLATE, DOCTOR_TEMPLATE_FILE)
     else: DOCTOR_TEMPLATE = load_data(DOCTOR_TEMPLATE_FILE)
 
-# 【修復】移除會在啟動時讀寫檔案的函式，改由使用者介面觸發
+def pre_populate_schedules_if_empty():
+    """僅在 data.json 完全為空時，為範本醫師預填資料"""
+    if not DOCTOR_SCHEDULE_SUBMISSIONS:
+        today = datetime.today()
+        for i in range(0, 3):
+            target_date = today + timedelta(days=30 * i)
+            year, month = target_date.year, target_date.month
+            month_key = get_month_key(year, month)
+            for name, template in DOCTOR_TEMPLATE.items():
+                DOCTOR_SCHEDULE_SUBMISSIONS[month_key][name] = {
+                    "days_off": template.get('days_off', []), "area": template.get("area", "A"),
+                    "points_limit": template.get("points_limit", 8), "submitted": True, "is_template": True
+                }
+        save_data(DOCTOR_SCHEDULE_SUBMISSIONS, DATA_FILE)
+
 DOCTOR_SCHEDULE_SUBMISSIONS = load_data(DATA_FILE, lambda: defaultdict(dict))
 initialize_doctor_template()
+pre_populate_schedules_if_empty()
 
 # --- Flask 路由 ---
 @app.route('/')
