@@ -1,287 +1,278 @@
-import pandas as pd
-from ortools.sat.python import cp_model
-import holidays
-from openpyxl.styles import PatternFill, Font, Alignment, Border, Side
-from openpyxl.utils import get_column_letter
-from collections import defaultdict
+# --------------------------------------------------------------------------
+# 智慧排班系統 - Flask 網頁應用程式 (v2.1.0 - 優化版)
+# --------------------------------------------------------------------------
 import os
+import io
+import pandas as pd
+from flask import Flask, render_template, request, jsonify, Response, send_from_directory
+import json
+import threading
+from datetime import datetime, timedelta
+from collections import defaultdict
+from queue import Queue
+import holidays
 
-class WebSolutionCounter(cp_model.CpSolverSolutionCallback):
-    def __init__(self, objectives, weights, queue_callback):
-        super().__init__()
-        self._solution_count = 0
-        self._objectives = objectives
-        self._weights = weights
-        self.queue_callback = queue_callback
-        self._display_order = [
-            ('total_used_points', '總使用點數'), ('linear_gaps_bonus', '線性間隔獎勵'),
-            ('min_gap_count', '隔兩天次數(懲罰)'), ('fairness_penalty', '同儕公平性(懲罰)'),
-            ('total_shifts_filled', '總排班數量'), ('i_priority_bonus', 'I 區優先獎勵'),
-            ('home_area_bonus', '在家區域獎勵')
-        ]
+# 匯入我們重構後的排班引擎
+# 檔名維持 scheduler.py，但內容會更新
+from scheduler import solve_schedule_web
 
-    def on_solution_callback(self):
-        self._solution_count += 1
-        self.queue_callback(f"--- 找到第 {self._solution_count} 個可行解 ---")
-        total_score = 0
-        for key, display_name in self._display_order:
-            if key in self._objectives:
-                raw_val = self.Value(self._objectives[key])
-                score = raw_val * self._weights[key]
-                total_score += score
-                self.queue_callback(f"  - {display_name:<12}: {raw_val:>5} (分數: {int(score)})")
-        self.queue_callback(f"  >> 此解總分: {int(total_score)}")
-        self.queue_callback("")
+# --- 應用程式設定 ---
+app = Flask(__name__)
+app.config['SEND_FILE_MAX_AGE_DEFAULT'] = 0
 
-    def solution_count(self):
-        return self._solution_count
+# --- 資料持久化設定 ---
+DATA_DIR = os.environ.get('RENDER_DISK_PATH', '.')
+DATA_FILE = os.path.join(DATA_DIR, 'data.json')
+DOCTOR_TEMPLATE_FILE = os.path.join(DATA_DIR, 'doctor_template.json')
+OUTPUT_DIR = os.path.join(DATA_DIR, 'output')
 
-def format_excel(writer, doctor_schedule_df, weekend_days, official_holidays, doctor_info):
-    workbook = writer.book
-    ws_doctor = writer.sheets['醫師月曆班表']
-    colors = {'A': 'ADD8E6', 'B': '90EE90', 'C': 'FFFFE0', 'I': 'FFB6C1'}
-    fills = {k: PatternFill(start_color=v, end_color=v, fill_type="solid") for k, v in colors.items()}
-    weekend_fill = PatternFill(start_color='F2F2F2', end_color='F2F2F2', fill_type="solid")
-    holiday_fill = PatternFill(start_color='FFDDC1', end_color='FFDDC1', fill_type="solid")
-    unavailable_fill = PatternFill(patternType='solid', fgColor='A9A9A9') # Changed from gray0625 for better visibility
-    header_fill = PatternFill(start_color='DDEBF7', end_color='DDEBF7', fill_type="solid")
-    header_font = Font(bold=True, color='000000')
-    center_align = Alignment(horizontal='center', vertical='center', wrap_text=True)
-    thin_border = Border(left=Side(style='thin'), right=Side(style='thin'), top=Side(style='thin'), bottom=Side(style='thin'))
+if not os.path.exists(OUTPUT_DIR):
+    os.makedirs(OUTPUT_DIR)
 
-    for col_idx, day in enumerate(doctor_schedule_df.columns, 2):
-        col_letter = get_column_letter(col_idx)
-        fill_to_apply = None
-        if day in official_holidays: fill_to_apply = holiday_fill
-        elif day in weekend_days: fill_to_apply = weekend_fill
-        if fill_to_apply:
-            for row_idx in range(1, ws_doctor.max_row + 1):
-                ws_doctor.cell(row=row_idx, column=col_idx).fill = fill_to_apply
+# --- 全域資料儲存 ---
+DOCTOR_SCHEDULE_SUBMISSIONS = defaultdict(lambda: defaultdict(dict))
+DOCTOR_TEMPLATE = {}
 
-    for r_idx, doc in enumerate(doctor_schedule_df.index, 2):
-        ws_doctor.cell(row=r_idx, column=1).font = Font(bold=True)
-        ws_doctor.row_dimensions[r_idx].height = 25
-        for c_idx, day in enumerate(doctor_schedule_df.columns, 2):
-            cell = ws_doctor.cell(row=r_idx, column=c_idx)
-            cell.alignment = center_align
-            cell.border = thin_border
-            if cell.value and str(cell.value) in fills:
-                cell.fill = fills[str(cell.value)]
+# --- 輔助函式 ---
+def get_month_key(year, month):
+    return f"{year}-{str(month).zfill(2)}"
 
-    doc_to_row_map = {doc: i + 2 for i, doc in enumerate(doctor_schedule_df.index)}
-    for doc, info in doctor_info.items():
-        row_idx = doc_to_row_map[doc]
-        for day_off in info.get('不可排班日', []): # Use .get for safety
-            if day_off in doctor_schedule_df.columns:
-                day_col_idx = list(doctor_schedule_df.columns).index(day_off) + 2
-                cell = ws_doctor.cell(row=row_idx, column=day_col_idx)
-                cell.fill = unavailable_fill
-                cell.value = "預休"
-                cell.font = Font(color='FFFFFF', bold=True)
+def save_data(data, file_path):
+    """通用儲存函式"""
+    with open(file_path, 'w', encoding='utf-8') as f:
+        json.dump(data, f, ensure_ascii=False, indent=4)
 
-    for col_idx in range(1, ws_doctor.max_column + 1):
-        cell = ws_doctor.cell(row=1, column=col_idx)
-        cell.font = header_font
-        cell.alignment = center_align
-        cell.border = thin_border
-        cell.fill = header_fill
-        ws_doctor.column_dimensions[get_column_letter(col_idx)].width = 6
-    ws_doctor.row_dimensions[1].height = 20
-    ws_doctor.column_dimensions['A'].width = 12
+def load_data(file_path, default_factory=None):
+    """通用讀取函式"""
+    if os.path.exists(file_path):
+        with open(file_path, 'r', encoding='utf-8') as f:
+            try:
+                loaded_data = json.load(f)
+                if default_factory:
+                    # 如果是排班資料，確保是 defaultdict
+                    data = defaultdict(default_factory)
+                    for k, v in loaded_data.items():
+                        data[k] = defaultdict(dict, v)
+                    return data
+                return loaded_data
+            except json.JSONDecodeError:
+                return default_factory() if default_factory else {}
+    return default_factory() if default_factory else {}
 
-    ws_summary = writer.sheets['點數統計總覽']
-    for col_idx in range(1, ws_summary.max_column + 1):
-        ws_summary.column_dimensions[get_column_letter(col_idx)].width = 15
-        ws_summary.cell(row=1, column=col_idx).font = header_font
-        ws_summary.cell(row=1, column=col_idx).fill = header_fill
-
-# 函式簽名不變，但內部邏輯會使用 doctor_data 中新增的資訊
-def solve_schedule_web(doctor_data, year, month, q, output_base_dir):
-    try:
-        q.put("1. 正在讀取總醫師設定的醫師資料...")
-        if not doctor_data:
-            raise ValueError("排班資料為空，請確認總醫師已儲存設定。")
-            
-        df = pd.DataFrame(doctor_data)
+def initialize_doctor_template():
+    """從 CSV 字串初始化醫師範本資料，如果範本檔案不存在的話"""
+    global DOCTOR_TEMPLATE
+    if not os.path.exists(DOCTOR_TEMPLATE_FILE):
+        csv_data = """
+醫師姓名,區域,點數上限
+如,A,8
+秀,A,8
+橋,A,6
+君,A,6
+翔,A,6
+航,A,8
+淇,B,8
+慈,B,8
+恩,B,8
+屹,B,8
+軒,B,6
+佑,C,8
+翰,C,6
+潔,C,5
+諺,C,5
+宣,C,8
+韶,C,8
+然,I,8
+偉,I,8
+煒,I,7
+"""
+        data_io = io.StringIO(csv_data)
+        df = pd.read_csv(data_io, engine='python').apply(lambda x: x.str.strip() if x.dtype == "object" else x)
         
-        YEAR, MONTH = year, month
-        num_days = pd.Period(f'{YEAR}-{MONTH}-01').days_in_month
-        date_range = pd.to_datetime(pd.Series(pd.date_range(start=f'{YEAR}-{MONTH}-01', end=f'{YEAR}-{MONTH}-{num_days}')))
-        weekend_days = date_range[date_range.dt.dayofweek.isin([5, 6])].dt.day.tolist()
-        official_holidays = [d.day for d in holidays.TW(years=YEAR) if d.month == MONTH]
-        double_point_days = set(weekend_days + official_holidays)
-        doctors = df['醫師姓名'].tolist()
-        areas = ['A', 'B', 'C', 'I']
-        doctor_info = df.set_index('醫師姓名').to_dict('index')
-
-        q.put("2. 正在建立數學模型...")
-        model = cp_model.CpModel()
-        
-        shifts = {}
-        for doc in doctors:
-            for day in range(1, num_days + 1):
-                for area in areas:
-                    shifts[(doc, day, area)] = model.NewBoolVar(f'shift_{doc}_{day}_{area}')
-
-        # --- 硬性規則 ---
-        for day in range(1, num_days + 1):
-            for area in areas: model.AddAtMostOne([shifts[(doc, day, area)] for doc in doctors])
-        for day in range(1, num_days + 1):
-            for doc in doctors: model.AddAtMostOne([shifts[(doc, day, area)] for area in areas])
-        
-        i_doctors = [d for d, info in doctor_info.items() if info['區域'] == 'I']
-        support_doctors = [d for d, info in doctor_info.items() if info['區域'] in ['A', 'B', 'C']]
-        for day in range(1, num_days + 1): model.Add(sum(shifts[(doc, day, 'I')] for doc in support_doctors) == 0)
-        
-        for doc in doctors:
-            for day in range(1, num_days - 1): model.Add(sum(shifts[doc, d, area] for area in areas for d in range(day, day+3)) <= 1)
-        
-        for doc in doctors:
-            for day in doctor_info[doc].get('不可排班日', []):
-                if 1 <= day <= num_days:
-                    for area in areas: model.Add(shifts[(doc, day, area)] == 0)
-
-        # *** 新增硬性規則：處理前一個月倒數兩天有值班的情況 ***
-        for doc in doctors:
-            if doctor_info[doc].get('上月倒數兩日值班', False):
-                # 如果勾選了，則該醫師在 1 號的班別必須為 0
-                q.put(f"   - 規則：醫師 {doc} 因上月班別，本月 1 號不可排班。")
-                for area in areas:
-                    model.Add(shifts[(doc, 1, area)] == 0)
-        
-        points_per_doctor = {}
-        for doc in doctors:
-            points_for_doc = sum(shifts[(doc, day, area)] * (2 if day in double_point_days else 1) for day in range(1, num_days + 1) for area in areas)
-            points_per_doctor[doc] = points_for_doc
-            model.Add(points_per_doctor[doc] <= doctor_info[doc]['點數上限'])
-
-        # --- 軟性目標 (與原始碼相同) ---
-        is_work_day = {}
-        for doc in doctors:
-            for day in range(1, num_days + 1):
-                is_work_day[doc, day] = model.NewBoolVar(f'is_work_day_{doc}_{day}')
-                model.Add(is_work_day[doc, day] == sum(shifts[doc, day, area] for area in areas))
-        total_used_points = sum(points_per_doctor.values())
-        all_linear_bonuses = []
-        for doc in doctors:
-            for d1 in range(1, num_days + 1):
-                for d2 in range(d1 + 1, num_days + 1):
-                    is_consecutive = model.NewBoolVar(f'consecutive_{doc}_{d1}_{d2}')
-                    no_work_in_between_literals = [is_work_day[doc, d].Not() for d in range(d1 + 1, d2)]
-                    model.AddBoolAnd([is_work_day[doc, d1], is_work_day[doc, d2]] + no_work_in_between_literals).OnlyEnforceIf(is_consecutive)
-                    model.AddBoolOr([is_work_day[doc, d1].Not(), is_work_day[doc, d2].Not()] + [is_work_day[doc, d] for d in range(d1 + 1, d2)]).OnlyEnforceIf(is_consecutive.Not())
-                    gap = d2 - d1
-                    linear_bonus = 10 * gap
-                    all_linear_bonuses.append(is_consecutive * linear_bonus)
-        total_linear_gaps_bonus = sum(all_linear_bonuses)
-        min_gap_penalties = []
-        for doc in doctors:
-            for day in range(1, num_days - 2):
-                has_min_gap = model.NewBoolVar(f'has_min_gap_{doc}_{day}')
-                model.AddBoolAnd([is_work_day[doc, day], is_work_day[doc, day + 3]]).OnlyEnforceIf(has_min_gap)
-                model.AddBoolOr([is_work_day[doc, day].Not(), is_work_day[doc, day + 3].Not()]).OnlyEnforceIf(has_min_gap.Not())
-                min_gap_penalties.append(has_min_gap)
-        total_min_gap_count = sum(min_gap_penalties)
-        peer_groups = defaultdict(list)
-        for doc, info in doctor_info.items():
-            key = (info['區域'], info['點數上限'])
-            peer_groups[key].append(doc)
-        all_ranges = []
-        for group_key, group_docs in peer_groups.items():
-            if len(group_docs) > 1:
-                group_points = [points_per_doctor[doc] for doc in group_docs]
-                min_points, max_points = model.NewIntVar(0, 100, ''), model.NewIntVar(0, 100, '')
-                model.AddMinEquality(min_points, group_points)
-                model.AddMaxEquality(max_points, group_points)
-                group_range = model.NewIntVar(0, 100, '')
-                model.Add(group_range == max_points - min_points)
-                all_ranges.append(group_range)
-        fairness_penalty = sum(all_ranges)
-        total_shifts_filled = sum(shifts.values())
-        i_priority_bonus = sum(shifts[(doc, day, 'I')] for doc in i_doctors for day in range(1, num_days + 1))
-        home_area_bonus = sum(shifts[(doc, day, info['區域'])] for doc, info in doctor_info.items() for day in range(1, num_days + 1))
-        
-        objectives = {'total_used_points': total_used_points, 'linear_gaps_bonus': total_linear_gaps_bonus, 'min_gap_count': total_min_gap_count, 'fairness_penalty': fairness_penalty, 'total_shifts_filled': total_shifts_filled, 'i_priority_bonus': i_priority_bonus, 'home_area_bonus': home_area_bonus}
-        weights = {'total_used_points': 10000, 'linear_gaps_bonus': 10, 'min_gap_count': -500, 'fairness_penalty': -200, 'total_shifts_filled': 100, 'i_priority_bonus': 10, 'home_area_bonus': 0.1}
-        model.Maximize(sum(objectives[name] * weights[name] for name in objectives))
-
-        solver = cp_model.CpSolver()
-        solver.parameters.enumerate_all_solutions = True
-        solution_counter = WebSolutionCounter(objectives, weights, q.put)
-        solver.parameters.max_time_in_seconds = 120.0
-        q.put(f"3. 正在運算，尋找所有可能的排班方案 ({YEAR}-{MONTH})...")
-        status = solver.Solve(model, solution_counter)
-
-        if status == cp_model.OPTIMAL or status == cp_model.FEASIBLE:
-            q.put("4. 已找到最佳解！正在生成視覺化報告...")
-            
-            final_schedule_data = defaultdict(dict)
-            for doc in doctors:
-                for day in range(1, num_days + 1):
-                    for area in areas:
-                        if solver.Value(shifts[(doc, day, area)]) == 1:
-                            final_schedule_data[doc][day] = area
-
-            points_summary_data = []
-            for doc in doctors:
-                points_used, days_worked = 0, []
-                for day in range(1, num_days + 1):
-                    if day in final_schedule_data.get(doc, {}):
-                        area = final_schedule_data[doc][day]
-                        points_used += 2 if day in double_point_days else 1
-                        days_worked.append(f"{day}({area})")
-                points_summary_data.append({'醫師姓名': doc, '區域': doctor_info[doc]['區域'], '點數上限': doctor_info[doc]['點數上限'], '實際點數': points_used, '剩餘點數': doctor_info[doc]['點數上限'] - points_used, '排班日與區域': ", ".join(days_worked)})
-            
-            final_scores = {display_name: solver.Value(objectives[key]) for key, display_name in solution_counter._display_order if key in objectives}
-
-            doctor_schedule_df = pd.DataFrame('', index=doctors, columns=range(1, num_days + 1))
-            for doc, day_map in final_schedule_data.items():
-                for day, area in day_map.items():
-                    if doc in doctor_schedule_df.index and day in doctor_schedule_df.columns:
-                        doctor_schedule_df.loc[doc, day] = area
-            
-            points_summary_df = pd.DataFrame(points_summary_data)
-            
-            schedule_df = pd.DataFrame("", index=range(1, num_days + 1), columns=areas)
-            for doc, day_area_map in final_schedule_data.items():
-                for day, area in day_area_map.items():
-                    schedule_df.loc[day, area] = doc
-
-            output_filename = f'schedule_result_{YEAR}-{MONTH}.xlsx'
-            output_filepath = os.path.join(output_base_dir, output_filename)
-            with pd.ExcelWriter(output_filepath, engine='openpyxl') as writer:
-                doctor_schedule_df.to_excel(writer, sheet_name='醫師月曆班表')
-                points_summary_df.to_excel(writer, sheet_name='點數統計總覽', index=False)
-                schedule_df.to_excel(writer, sheet_name='區域班表')
-                format_excel(writer, doctor_schedule_df, weekend_days, official_holidays, doctor_info)
-
-            q.put(f"\n✅ **排班完成！**")
-            q.put(f"   詳細結果請點擊下方的按鈕下載 **{output_filename}** 檔案。")
-            q.put("\n--- 最終排班結果分析 ---")
-            q.put(f"在所有規則限制下，系統總共找到了 **{solution_counter.solution_count()}** 種不同的可行排班方案。")
-            q.put(f"呈現的是其中一個綜合評分最高的「最佳解」。")
-            
-            result_payload = {
-                "status": "success", "final_scores": final_scores,
-                "schedule_data": {
-                    "doctors": doctors, "num_days": num_days,
-                    "schedule": final_schedule_data,
-                    "holidays": official_holidays,
-                    "weekends": weekend_days,
-                    "days_off": {doc: info.get('不可排班日', []) for doc, info in doctor_info.items()},
-                    "doctor_info": doctor_info
-                },
-                "points_summary_html": points_summary_df.to_html(classes='table table-hover', index=False),
-                "area_schedule_html": schedule_df.to_html(classes='table table-bordered table-sm text-center'),
-                "excel_url": f"/output/{output_filename}"
+        for _, row in df.iterrows():
+            DOCTOR_TEMPLATE[row['醫師姓名']] = {
+                'area': row['區域'],
+                'points_limit': int(row['點數上限']),
             }
-            q.put(result_payload)
-        else:
-            q.put("\n❌ **錯誤：** 在目前的規則下，找不到任何可行的排班解。")
-            q.put({"status": "error", "message": "找不到可行的排班解。請檢查總醫師設定是否有衝突。"})
+        save_data(DOCTOR_TEMPLATE, DOCTOR_TEMPLATE_FILE)
+    else:
+        DOCTOR_TEMPLATE = load_data(DOCTOR_TEMPLATE_FILE)
+
+
+# --- 應用程式啟動時載入資料 ---
+DOCTOR_SCHEDULE_SUBMISSIONS = load_data(DATA_FILE, lambda: defaultdict(dict))
+initialize_doctor_template()
+
+# --- Flask 路由 ---
+@app.route('/')
+def index():
+    return render_template('index.html')
+
+@app.route('/doctor')
+def doctor_portal():
+    return render_template('doctor.html')
+
+@app.route('/admin')
+def admin_portal():
+    return render_template('admin.html')
+
+@app.route('/output/<filename>')
+def serve_output_file(filename):
+    return send_from_directory(OUTPUT_DIR, filename, as_attachment=True)
+
+
+# --- API 端點 ---
+@app.route('/api/schedule_data/<year>/<month>')
+def get_schedule_data(year, month):
+    month_key = get_month_key(year, month)
+    tw_holidays = holidays.TW(years=int(year))
+    holiday_list = [d.day for d in tw_holidays if d.month == int(month)]
+
+    # 確保所有範本中的醫師都存在於當月的提交清單中
+    # 這樣總醫師才能看到完整的預設清單
+    for name, template in DOCTOR_TEMPLATE.items():
+        if name not in DOCTOR_SCHEDULE_SUBMISSIONS[month_key]:
+            DOCTOR_SCHEDULE_SUBMISSIONS[month_key][name] = {
+                "days_off": [],
+                "area": template.get("area", "A"),
+                "points_limit": template.get("points_limit", 8),
+                "submitted": False,
+                "is_template": True # 標記這是從範本來的預設資料
+            }
+
+    response_data = {
+        "submissions": DOCTOR_SCHEDULE_SUBMISSIONS.get(month_key, {}),
+        "holidays": holiday_list,
+        "doctor_template": DOCTOR_TEMPLATE # 將範本資料也傳給前端
+    }
+    return jsonify(response_data)
+
+@app.route('/api/submit_days_off', methods=['POST'])
+def submit_days_off():
+    data = request.json
+    year, month, doc_name = data.get('year'), data.get('month'), data.get('doctor')
+    days_off = data.get('daysOff', [])
+    month_key = get_month_key(year, month)
+
+    # 不論醫師之前是否存在，都更新或建立他的資料
+    if doc_name:
+        # 如果醫師是第一次提交，且存在於範本中，則帶入範本設定
+        if doc_name not in DOCTOR_SCHEDULE_SUBMISSIONS[month_key] and doc_name in DOCTOR_TEMPLATE:
+            template = DOCTOR_TEMPLATE[doc_name]
+            DOCTOR_SCHEDULE_SUBMISSIONS[month_key][doc_name] = {
+                "area": template.get("area", "A"),
+                "points_limit": template.get("points_limit", 8),
+            }
+        
+        # 更新或新增預休資料
+        DOCTOR_SCHEDULE_SUBMISSIONS[month_key][doc_name].update({
+            'days_off': days_off,
+            'submitted': True,
+            'is_template': False # 一旦提交，就不是範本狀態了
+        })
+        
+        save_data(DOCTOR_SCHEDULE_SUBMISSIONS, DATA_FILE)
+        return jsonify({'status': 'success', 'message': f'{doc_name} 於 {month_key} 的預休已提交。'})
     
+    return jsonify({'status': 'error', 'message': '醫師姓名不可為空'}), 400
+
+@app.route('/api/update_doctor_settings', methods=['POST'])
+def update_doctor_settings():
+    data = request.json
+    year, month = data.get('year'), data.get('month')
+    settings = data.get('settings', {})
+    month_key = get_month_key(year, month)
+    
+    if not settings:
+        return jsonify({'status': 'error', 'message': '沒有設定資料'}), 400
+        
+    # 直接用新的設定覆蓋當月的醫師資料
+    # 這邊不再需要檢查醫師是否存在，因為前端會傳來完整的列表
+    DOCTOR_SCHEDULE_SUBMISSIONS[month_key] = defaultdict(dict, settings)
+    
+    save_data(DOCTOR_SCHEDULE_SUBMISSIONS, DATA_FILE)
+    return jsonify({'status': 'success', 'message': '醫師設定已成功儲存！'})
+
+
+@app.route('/api/run_scheduler')
+def run_scheduler_endpoint():
+    try:
+        year = int(request.args.get('year'))
+        month = int(request.args.get('month'))
+        month_key = get_month_key(year, month)
+        
+        # 1. 取得當前月份的醫師設定
+        current_month_settings = DOCTOR_SCHEDULE_SUBMISSIONS.get(month_key, {})
+        if not current_month_settings:
+            return Response(json.dumps({"status": "error", "message": "當月無任何醫師設定，請先儲存設定。"}), 
+                            mimetype='application/json', status=400)
+
+        # 2. 自動化取得上個月的班表情況
+        prev_month_date = datetime(year, month, 1) - timedelta(days=1)
+        prev_month_key = get_month_key(prev_month_date.year, prev_month_date.month)
+        prev_month_schedule = DOCTOR_SCHEDULE_SUBMISSIONS.get(prev_month_key, {}).get("final_schedule", {})
+
+        # 3. 組合最終要傳給排班引擎的資料
+        doctor_data_for_scheduler = []
+        for name, info in current_month_settings.items():
+            # final_schedule 是排班完後儲存的結果，如果沒有就不處理
+            if name == "final_schedule": continue
+
+            # 檢查上月最後兩天班表
+            last_month_duty_day = 0
+            if prev_month_schedule and name in prev_month_schedule:
+                last_day_of_prev_month = prev_month_date.day
+                doc_prev_schedule = prev_month_schedule[name]
+                if str(last_day_of_prev_month) in doc_prev_schedule:
+                    last_month_duty_day = last_day_of_prev_month
+                elif str(last_day_of_prev_month - 1) in doc_prev_schedule:
+                    last_month_duty_day = last_day_of_prev_month - 1
+            
+            doctor_data_for_scheduler.append({
+                '醫師姓名': name,
+                '區域': info.get('area', 'A'),
+                '點數上限': info.get('points_limit', 8),
+                '不可排班日': info.get('days_off', []),
+                '上月班別日': last_month_duty_day # 0 表示上月最後兩天無班
+            })
+
+        q = Queue()
+
+        def event_stream():
+            while True:
+                log_entry = q.get()
+                if log_entry == "DONE_SUCCESS":
+                    # 排班成功後，將最終班表存回 data.json
+                    final_result = q.get()
+                    if 'schedule' in final_result:
+                        # 將 dictionary 的 key 從 int 轉為 str，以符合 JSON 格式
+                        final_schedule_dict = {doc: {str(day): area for day, area in schedule.items()} 
+                                               for doc, schedule in final_result['schedule'].items()}
+                        DOCTOR_SCHEDULE_SUBMISSIONS[month_key]['final_schedule'] = final_schedule_dict
+                        save_data(DOCTOR_SCHEDULE_SUBMISSIONS, DATA_FILE)
+                    
+                    json_data = json.dumps(final_result)
+                    yield f"event: DONE\ndata: {json_data}\n\n"
+                    break # 結束 stream
+
+                elif log_entry == "DONE_ERROR":
+                    error_result = q.get()
+                    json_data = json.dumps(error_result)
+                    yield f"event: DONE\ndata: {json_data}\n\n"
+                    break # 結束 stream
+                
+                elif isinstance(log_entry, str):
+                    yield f"data: {log_entry}\n\n"
+
+        threading.Thread(target=solve_schedule_web, args=(doctor_data_for_scheduler, year, month, q, OUTPUT_DIR)).start()
+        return Response(event_stream(), mimetype='text/event-stream')
+
     except Exception as e:
-        q.put(f"\n❌ **後端錯誤：** {e}")
-        q.put({"status": "error", "message": f"後端發生錯誤: {e}"})
-    finally:
-        q.put("DONE")
+        # 處理 API 自身的錯誤
+        error_payload = {"status": "error", "message": f"API 內部錯誤: {str(e)}"}
+        json_data = json.dumps(error_payload)
+        return Response(f"event: DONE\ndata: {json_data}\n\n", mimetype='text/event-stream')
+
+# if __name__ == '__main__':
+#     # 這段主要用於本地開發，Render/Gunicorn 會用別的方式啟動
+#     app.run(host='0.0.0.0', port=int(os.environ.get('PORT', 5000)), debug=True)

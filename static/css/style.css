@@ -191,6 +191,13 @@ main {
     color: white;
     font-weight: bold;
 }
+/* New style for cross-month off days */
+.cell-cross-month-off {
+    background-color: #D8BFD8 !important; /* Light purple */
+    color: black !important;
+    font-weight: bold;
+}
+
 .cell-area-A { background-color: #ADD8E6; }
 .cell-area-B { background-color: #90EE90; }
 .cell-area-C { background-color: #FFFFE0; }
@@ -209,3 +216,20 @@ main {
 }
 #download-excel-btn, #fullscreen-btn, #schedule-filters { display: none; }
 #main-content, #doctor-info-card, #welcome-message, #results-section { transition: opacity 0.5s ease-in-out; }
+
+/* Drag and Drop styles */
+#doctor-settings-tbody tr {
+    cursor: grab;
+}
+#doctor-settings-tbody tr:active {
+    cursor: grabbing;
+}
+.drag-handle {
+    cursor: grab;
+    font-size: 1.2rem;
+    color: #6c757d;
+}
+.sortable-ghost {
+    background: #e9ecef;
+    opacity: 0.5;
+}

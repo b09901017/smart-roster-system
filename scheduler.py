@@ -5,6 +5,9 @@ from openpyxl.styles import PatternFill, Font, Alignment, Border, Side
 from openpyxl.utils import get_column_letter
 from collections import defaultdict
 import os
+import time
+from datetime import datetime, timedelta
+
 
 class WebSolutionCounter(cp_model.CpSolverSolutionCallback):
     def __init__(self, objectives, weights, queue_callback):
@@ -43,14 +46,14 @@ def format_excel(writer, doctor_schedule_df, weekend_days, official_holidays, do
     fills = {k: PatternFill(start_color=v, end_color=v, fill_type="solid") for k, v in colors.items()}
     weekend_fill = PatternFill(start_color='F2F2F2', end_color='F2F2F2', fill_type="solid")
     holiday_fill = PatternFill(start_color='FFDDC1', end_color='FFDDC1', fill_type="solid")
-    unavailable_fill = PatternFill(patternType='gray0625', fgColor='A9A9A9')
+    unavailable_fill = PatternFill(patternType='solid', fgColor='A9A9A9')
+    cross_month_fill = PatternFill(patternType='solid', fgColor='D8BFD8') # 淡紫色
     header_fill = PatternFill(start_color='DDEBF7', end_color='DDEBF7', fill_type="solid")
     header_font = Font(bold=True, color='000000')
     center_align = Alignment(horizontal='center', vertical='center', wrap_text=True)
     thin_border = Border(left=Side(style='thin'), right=Side(style='thin'), top=Side(style='thin'), bottom=Side(style='thin'))
 
     for col_idx, day in enumerate(doctor_schedule_df.columns, 2):
-        col_letter = get_column_letter(col_idx)
         fill_to_apply = None
         if day in official_holidays: fill_to_apply = holiday_fill
         elif day in weekend_days: fill_to_apply = weekend_fill
@@ -67,17 +70,39 @@ def format_excel(writer, doctor_schedule_df, weekend_days, official_holidays, do
             cell.border = thin_border
             if cell.value and str(cell.value) in fills:
                 cell.fill = fills[str(cell.value)]
-    
+
     doc_to_row_map = {doc: i + 2 for i, doc in enumerate(doctor_schedule_df.index)}
     for doc, info in doctor_info.items():
         row_idx = doc_to_row_map[doc]
-        for day_off in info['不可排班日']:
+        # 標記預休
+        for day_off in info.get('不可排班日', []):
             if day_off in doctor_schedule_df.columns:
                 day_col_idx = list(doctor_schedule_df.columns).index(day_off) + 2
                 cell = ws_doctor.cell(row=row_idx, column=day_col_idx)
                 cell.fill = unavailable_fill
                 cell.value = "預休"
                 cell.font = Font(color='FFFFFF', bold=True)
+        
+        # 新增：標記跨月休息
+        last_duty_day = info.get('上月班別日', 0)
+        if last_duty_day > 0:
+            prev_month_date = datetime(info['YEAR'], info['MONTH'], 1) - timedelta(days=1)
+            last_day_of_prev_month = prev_month_date.day
+            
+            if last_duty_day == last_day_of_prev_month:
+                for day in [1, 2]:
+                    if day in doctor_schedule_df.columns:
+                        day_col_idx = list(doctor_schedule_df.columns).index(day) + 2
+                        cell = ws_doctor.cell(row=row_idx, column=day_col_idx)
+                        cell.fill = cross_month_fill
+                        cell.value = "跨月休"
+            elif last_duty_day == last_day_of_prev_month - 1:
+                 if 1 in doctor_schedule_df.columns:
+                    day_col_idx = list(doctor_schedule_df.columns).index(1) + 2
+                    cell = ws_doctor.cell(row=row_idx, column=day_col_idx)
+                    cell.fill = cross_month_fill
+                    cell.value = "跨月休"
+
 
     for col_idx in range(1, ws_doctor.max_column + 1):
         cell = ws_doctor.cell(row=1, column=col_idx)
@@ -92,13 +117,19 @@ def format_excel(writer, doctor_schedule_df, weekend_days, official_holidays, do
     ws_summary = writer.sheets['點數統計總覽']
     for col_idx in range(1, ws_summary.max_column + 1):
         ws_summary.column_dimensions[get_column_letter(col_idx)].width = 15
-        ws_summary.cell(row=1, column=col_idx).font = header_font
-        ws_summary.cell(row=1, column=col_idx).fill = header_fill
+        for row_idx in range(1, ws_summary.max_row + 1):
+            cell = ws_summary.cell(row=row_idx, column=col_idx)
+            cell.alignment = Alignment(horizontal='center', vertical='center')
+            if row_idx == 1:
+                cell.font = header_font
+                cell.fill = header_fill
 
-# 修改函式簽名，接收 output_base_dir
 def solve_schedule_web(doctor_data, year, month, q, output_base_dir):
     try:
-        q.put("1. 正在讀取前端傳來的醫師資料...")
+        q.put("1. 成功讀取總醫師設定與自動化跨月規則...")
+        if not doctor_data:
+            raise ValueError("排班資料為空，請確認總醫師已儲存設定。")
+            
         df = pd.DataFrame(doctor_data)
         
         YEAR, MONTH = year, month
@@ -110,6 +141,10 @@ def solve_schedule_web(doctor_data, year, month, q, output_base_dir):
         doctors = df['醫師姓名'].tolist()
         areas = ['A', 'B', 'C', 'I']
         doctor_info = df.set_index('醫師姓名').to_dict('index')
+        for doc in doctor_info: # 注入年份月份供 excel formatter 使用
+            doctor_info[doc]['YEAR'] = YEAR
+            doctor_info[doc]['MONTH'] = MONTH
+
 
         q.put("2. 正在建立數學模型...")
         model = cp_model.CpModel()
@@ -120,20 +155,49 @@ def solve_schedule_web(doctor_data, year, month, q, output_base_dir):
                 for area in areas:
                     shifts[(doc, day, area)] = model.NewBoolVar(f'shift_{doc}_{day}_{area}')
 
-        # --- 硬性規則 (與原始碼相同) ---
+        # --- 硬性規則 ---
+        q.put("   - 建立每日、每人、每區的基礎限制...")
+        # 每天每個區域最多一位醫師
         for day in range(1, num_days + 1):
             for area in areas: model.AddAtMostOne([shifts[(doc, day, area)] for doc in doctors])
+        # 每天每位醫師最多一個班
         for day in range(1, num_days + 1):
             for doc in doctors: model.AddAtMostOne([shifts[(doc, day, area)] for area in areas])
+        
+        # I 區只能由 I 區醫師負責
         i_doctors = [d for d, info in doctor_info.items() if info['區域'] == 'I']
         support_doctors = [d for d, info in doctor_info.items() if info['區域'] in ['A', 'B', 'C']]
         for day in range(1, num_days + 1): model.Add(sum(shifts[(doc, day, 'I')] for doc in support_doctors) == 0)
+        
+        # 醫師排班後必須休息至少兩天 (三日內最多一班)
         for doc in doctors:
             for day in range(1, num_days - 1): model.Add(sum(shifts[doc, d, area] for area in areas for d in range(day, day+3)) <= 1)
+        
+        # 不可排班日 (預休)
         for doc in doctors:
-            for day in doctor_info[doc]['不可排班日']:
+            for day in doctor_info[doc].get('不可排班日', []):
                 if 1 <= day <= num_days:
                     for area in areas: model.Add(shifts[(doc, day, area)] == 0)
+
+        # 自動化跨月排班硬性規則
+        prev_month_date = datetime(year, month, 1) - timedelta(days=1)
+        last_day_of_prev_month = prev_month_date.day
+        for doc in doctors:
+            last_duty_day = doctor_info[doc].get('上月班別日', 0)
+            if last_duty_day == last_day_of_prev_month:
+                # 上個月最後一天值班，這個月 1, 2 號禁排
+                q.put(f"   - 自動規則：醫師 {doc} 因上月最後一日值班，本月 1, 2 日禁排。")
+                if 1 <= num_days:
+                    for area in areas: model.Add(shifts[(doc, 1, area)] == 0)
+                if 2 <= num_days:
+                    for area in areas: model.Add(shifts[(doc, 2, area)] == 0)
+            elif last_duty_day == last_day_of_prev_month - 1:
+                 # 上個月倒數第二天值班，這個月 1 號禁排
+                 q.put(f"   - 自動規則：醫師 {doc} 因上月倒數第二日值班，本月 1 日禁排。")
+                 if 1 <= num_days:
+                    for area in areas: model.Add(shifts[(doc, 1, area)] == 0)
+
+        # 點數上限
         points_per_doctor = {}
         for doc in doctors:
             points_for_doc = sum(shifts[(doc, day, area)] * (2 if day in double_point_days else 1) for day in range(1, num_days + 1) for area in areas)
@@ -232,8 +296,7 @@ def solve_schedule_web(doctor_data, year, month, q, output_base_dir):
                 for day, area in day_area_map.items():
                     schedule_df.loc[day, area] = doc
 
-            output_filename = f'schedule_result_{YEAR}-{MONTH}.xlsx'
-            # 使用傳入的 output_base_dir 來組合正確的檔案路徑
+            output_filename = f'schedule_result_{YEAR}-{MONTH}_{int(time.time())}.xlsx'
             output_filepath = os.path.join(output_base_dir, output_filename)
             with pd.ExcelWriter(output_filepath, engine='openpyxl') as writer:
                 doctor_schedule_df.to_excel(writer, sheet_name='醫師月曆班表')
@@ -249,25 +312,29 @@ def solve_schedule_web(doctor_data, year, month, q, output_base_dir):
             
             result_payload = {
                 "status": "success", "final_scores": final_scores,
-                "schedule_data": {
+                "schedule": final_schedule_data, # 傳遞原始 schedule data
+                "schedule_data_for_render": { # 傳遞渲染用的 data
                     "doctors": doctors, "num_days": num_days,
                     "schedule": final_schedule_data,
                     "holidays": official_holidays,
                     "weekends": weekend_days,
-                    "days_off": {doc: info['不可排班日'] for doc, info in doctor_info.items()},
+                    "days_off": {doc: info.get('不可排班日', []) for doc, info in doctor_info.items()},
                     "doctor_info": doctor_info
                 },
-                "points_summary_html": points_summary_df.to_html(classes='table table-hover', index=False),
+                "points_summary_html": points_summary_df.to_html(classes='table table-hover table-sm', index=False),
                 "area_schedule_html": schedule_df.to_html(classes='table table-bordered table-sm text-center'),
                 "excel_url": f"/output/{output_filename}"
             }
+            q.put("DONE_SUCCESS")
             q.put(result_payload)
         else:
-            q.put("\n❌ **錯誤：** 在目前的規則下，找不到任何可行的排班解。")
-            q.put({"status": "error", "message": "找不到可行的排班解。"})
+            error_msg = "在目前的規則下，找不到任何可行的排班解。請檢查總醫師設定是否有衝突（例如太多人預休在同一天）。"
+            q.put(f"\n❌ **錯誤：** {error_msg}")
+            q.put("DONE_ERROR")
+            q.put({"status": "error", "message": error_msg})
     
     except Exception as e:
+        error_msg = f"後端排班引擎發生嚴重錯誤: {e}"
         q.put(f"\n❌ **後端錯誤：** {e}")
-        q.put({"status": "error", "message": f"後端發生錯誤: {e}"})
-    finally:
-        q.put("DONE")
+        q.put("DONE_ERROR")
+        q.put({"status": "error", "message": error_msg})
