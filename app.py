@@ -1,5 +1,5 @@
 # --------------------------------------------------------------------------
-# 智慧排班系統 - Flask 網頁應用程式 (v2.3.0 - 功能優化與錯誤修復)
+# 智慧排班系統 - Flask 網頁應用程式 (v2.3.1 - 部署錯誤修復)
 # --------------------------------------------------------------------------
 import os
 import io
@@ -48,7 +48,6 @@ def load_data(file_path, default_factory=None):
 def initialize_doctor_template():
     global DOCTOR_TEMPLATE
     if not os.path.exists(DOCTOR_TEMPLATE_FILE):
-        # 為預設資料加入固定的 days_off
         csv_data = """醫師姓名,區域,點數上限,不可排班日
 如,A,8,"26,27"
 秀,A,8,"1,2,5,6"
@@ -83,35 +82,11 @@ def initialize_doctor_template():
         save_data(DOCTOR_TEMPLATE, DOCTOR_TEMPLATE_FILE)
     else: DOCTOR_TEMPLATE = load_data(DOCTOR_TEMPLATE_FILE)
 
-def pre_populate_schedules():
-    """為範本醫師預先填入未來幾個月的排休資料，用於測試"""
-    today = datetime.today()
-    for i in range(0, 6): # 預先產生包含本月在內的未來 6 個月資料
-        target_date = today + timedelta(days=30 * i)
-        year, month = target_date.year, target_date.month
-        month_key = get_month_key(year, month)
-        
-        # 只有當該月份完全沒有任何資料時，才進行預填
-        if not DOCTOR_SCHEDULE_SUBMISSIONS[month_key]:
-            for name, template in DOCTOR_TEMPLATE.items():
-                DOCTOR_SCHEDULE_SUBMISSIONS[month_key][name] = {
-                    "days_off": template.get('days_off', []),
-                    "area": template.get("area", "A"),
-                    "points_limit": template.get("points_limit", 8),
-                    "submitted": True, # 預設為已提交狀態
-                    "is_template": True
-                }
-    save_data(DOCTOR_SCHEDULE_SUBMISSIONS, DATA_FILE)
-
-
+# 【修復】移除會在啟動時讀寫檔案的函式，改由使用者介面觸發
 DOCTOR_SCHEDULE_SUBMISSIONS = load_data(DATA_FILE, lambda: defaultdict(dict))
 initialize_doctor_template()
-pre_populate_schedules() # 啟動時執行一次預填
 
-# --- (Flask 路由和 API 端點與 V2.2.2 版相同，此處省略以節省篇幅) ---
-# ...
-# (此處應貼上 V2.2.2 版本中從 @app.route('/') 到結尾的所有程式碼)
-# ...
+# --- Flask 路由 ---
 @app.route('/')
 def index(): return render_template('index.html')
 @app.route('/doctor')
@@ -120,6 +95,8 @@ def doctor_portal(): return render_template('doctor.html')
 def admin_portal(): return render_template('admin.html')
 @app.route('/output/<filename>')
 def serve_output_file(filename): return send_from_directory(OUTPUT_DIR, filename, as_attachment=True)
+
+# --- API 端點 ---
 @app.route('/api/schedule_data/<year>/<month>')
 def get_schedule_data(year, month):
     month_key = get_month_key(year, month)
