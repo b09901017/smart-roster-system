@@ -1,16 +1,15 @@
+/* ... (body 到 .calendar-day.selecting 的樣式保持不變) ... */
 body {
     font-family: 'Noto Sans TC', sans-serif;
     background-color: #f8f9fa;
 }
 main {
-    padding-bottom: 40vh; /* Add extra space at the bottom */
+    padding-bottom: 40vh;
 }
-
 .auth-container {
     background-color: white;
     max-width: 450px;
 }
-
 .sidebar {
     position: fixed;
     top: 0;
@@ -20,7 +19,6 @@ main {
     padding: 0;
     box-shadow: inset -1px 0 0 rgba(0, 0, 0, .1);
 }
-
 .sidebar-sticky {
     position: relative;
     height: 100vh;
@@ -28,26 +26,21 @@ main {
     overflow-x: hidden;
     overflow-y: auto;
 }
-
 .sidebar .nav-link {
     font-weight: 500;
     color: #333;
 }
-
 .sidebar-heading {
     font-size: 1.1rem;
     text-transform: uppercase;
     color: #555;
 }
-
-/* --- Calendar Styles --- */
 .calendar-grid {
     display: grid;
     grid-template-columns: repeat(7, 1fr);
     gap: 5px;
     user-select: none;
 }
-
 .calendar-day {
     border: 1px solid #e9ecef;
     padding: 10px;
@@ -56,24 +49,20 @@ main {
     border-radius: .25rem;
     transition: all 0.2s ease-in-out;
 }
-
 .calendar-day.header {
     background-color: #f8f9fa;
     font-weight: bold;
     cursor: default;
 }
-
 .calendar-day.other-month {
     background-color: #f8f9fa;
     color: #adb5bd;
     cursor: not-allowed;
 }
-
 .calendar-day.available:not(.holiday):hover {
     background-color: #e2e6ea;
     transform: scale(1.05);
 }
-
 .calendar-day.holiday {
     background-color: #FFDDC1;
     color: #5f3f00;
@@ -82,7 +71,6 @@ main {
     background-color: #ffcdaa;
     transform: scale(1.05);
 }
-
 .calendar-day.selected {
     background-color: #198754 !important;
     color: white !important;
@@ -94,10 +82,26 @@ main {
     border-color: #9ec5fe;
 }
 
+
+/* --- 【新增】醫師日曆唯讀模式 --- */
+.calendar-grid.is-readonly .calendar-day.available {
+    cursor: not-allowed;
+    background-color: #f8f9fa;
+    color: #6c757d;
+}
+.calendar-grid.is-readonly .calendar-day.available:hover {
+    transform: none; /* 移除放大效果 */
+}
+.calendar-grid.is-readonly .calendar-day.selected {
+    background-color: #6c757d !important; /* 已提交的顯示為灰色 */
+    border-color: #6c757d;
+}
+
+
 /* --- Admin Page Styles --- */
 #log-card-body {
     transition: all 0.3s ease-in-out;
-    padding: 1.25rem; /* Bootstrap default card-body padding */
+    padding: 1.25rem;
 }
 #log-card-body.minimized {
     padding: 0 !important;
@@ -109,12 +113,6 @@ main {
     height: 300px;
     overflow-y: auto;
 }
-
-#submission-status-container {
-    max-height: 250px;
-    overflow-y: auto;
-}
-
 #results-section .table-responsive {
     max-height: 60vh;
     overflow: auto;
@@ -123,8 +121,6 @@ main {
     max-height: none;
     height: 100%;
 }
-
-/* --- Result Table & Card Styles (Slim & Centered) --- */
 .table-wrapper {
     display: flex;
     justify-content: center;
@@ -133,15 +129,6 @@ main {
 .table-wrapper > .card {
     width: auto;
     max-width: 100%;
-}
-#points-summary-html table,
-#area-schedule-render-area table {
-    width: auto; /* Allow table to shrink to content */
-}
-#points-summary-html table th, #points-summary-html table td,
-#area-schedule-render-area table th, #area-schedule-render-area table td {
-    text-align: center;
-    vertical-align: middle;
 }
 .analysis-card-wrapper {
     display: flex;
@@ -152,7 +139,14 @@ main {
     max-width: 600px;
 }
 
-/* --- Result Table Visual Styles --- */
+/* --- 【新增】管理員表格區域顏色 --- */
+.area-A { background-color: rgba(173, 216, 230, 0.3); } /* Light Blue */
+.area-B { background-color: rgba(144, 238, 144, 0.3); } /* Light Green */
+.area-C { background-color: rgba(255, 255, 224, 0.5); } /* Light Yellow */
+.area-I { background-color: rgba(255, 182, 193, 0.3); } /* Light Pink */
+
+
+/* --- Result Table Visual Styles (保持不變) --- */
 .schedule-table {
     width: 100%;
     border-collapse: collapse;
@@ -183,7 +177,6 @@ main {
 .schedule-table th:first-child {
     z-index: 3;
 }
-
 .cell-weekend { background-color: #F2F2F2; }
 .cell-holiday { background-color: #FFDDC1; }
 .cell-dayoff {
@@ -191,19 +184,18 @@ main {
     color: white;
     font-weight: bold;
 }
-/* New style for cross-month off days */
 .cell-cross-month-off {
-    background-color: #D8BFD8 !important; /* Light purple */
+    background-color: #D8BFD8 !important;
     color: black !important;
     font-weight: bold;
 }
-
 .cell-area-A { background-color: #ADD8E6; }
 .cell-area-B { background-color: #90EE90; }
 .cell-area-C { background-color: #FFFFE0; }
 .cell-area-I { background-color: #FFB6C1; }
 
 
+/* --- (其他樣式保持不變) --- */
 #run-scheduler-btn:disabled { cursor: not-allowed; }
 #welcome-message { border: 2px dashed #ced4da; border-radius: 10px; color: #6c757d; margin-top: 5rem; }
 #final-scores-list .list-group-item { display: flex; justify-content: space-between; align-items: center; }
@@ -211,25 +203,10 @@ main {
 #final-scores-list .score-penalty { color: #dc3545; }
 #final-scores-list .score-bonus { color: #198754; }
 #final-scores-list .score-neutral { color: #6c757d; }
-#results-section .nav-pills .nav-link {
-    font-size: 0.9rem;
-}
+#results-section .nav-pills .nav-link { font-size: 0.9rem; }
 #download-excel-btn, #fullscreen-btn, #schedule-filters { display: none; }
 #main-content, #doctor-info-card, #welcome-message, #results-section { transition: opacity 0.5s ease-in-out; }
-
-/* Drag and Drop styles */
-#doctor-settings-tbody tr {
-    cursor: grab;
-}
-#doctor-settings-tbody tr:active {
-    cursor: grabbing;
-}
-.drag-handle {
-    cursor: grab;
-    font-size: 1.2rem;
-    color: #6c757d;
-}
-.sortable-ghost {
-    background: #e9ecef;
-    opacity: 0.5;
-}
+#doctor-settings-tbody tr { cursor: grab; }
+#doctor-settings-tbody tr:active { cursor: grabbing; }
+.drag-handle { cursor: grab; font-size: 1.2rem; color: #6c757d; }
+.sortable-ghost { background: #e9ecef; opacity: 0.5; }
