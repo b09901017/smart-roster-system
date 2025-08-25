@@ -1,5 +1,5 @@
 # --------------------------------------------------------------------------
-# 智慧排班系統 - Flask 網頁應用程式 (v2.1.0 - 優化版)
+# 智慧排班系統 - Flask 網頁應用程式 (v2.2.0 - Debug模式與點數計算)
 # --------------------------------------------------------------------------
 import os
 import io
@@ -13,7 +13,6 @@ from queue import Queue
 import holidays
 
 # 匯入我們重構後的排班引擎
-# 檔名維持 scheduler.py，但內容會更新
 from scheduler import solve_schedule_web
 
 # --- 應用程式設定 ---
@@ -49,7 +48,6 @@ def load_data(file_path, default_factory=None):
             try:
                 loaded_data = json.load(f)
                 if default_factory:
-                    # 如果是排班資料，確保是 defaultdict
                     data = defaultdict(default_factory)
                     for k, v in loaded_data.items():
                         data[k] = defaultdict(dict, v)
@@ -98,12 +96,11 @@ def initialize_doctor_template():
     else:
         DOCTOR_TEMPLATE = load_data(DOCTOR_TEMPLATE_FILE)
 
-
 # --- 應用程式啟動時載入資料 ---
 DOCTOR_SCHEDULE_SUBMISSIONS = load_data(DATA_FILE, lambda: defaultdict(dict))
 initialize_doctor_template()
 
-# --- Flask 路由 ---
+# --- Flask 路由 (保持不變) ---
 @app.route('/')
 def index():
     return render_template('index.html')
@@ -120,33 +117,36 @@ def admin_portal():
 def serve_output_file(filename):
     return send_from_directory(OUTPUT_DIR, filename, as_attachment=True)
 
-
 # --- API 端點 ---
 @app.route('/api/schedule_data/<year>/<month>')
 def get_schedule_data(year, month):
+    # 透過 URL 參數 ?debug=true/false 來控制模式
+    is_debug_mode = request.args.get('debug', 'true').lower() == 'true'
+    
     month_key = get_month_key(year, month)
     tw_holidays = holidays.TW(years=int(year))
     holiday_list = [d.day for d in tw_holidays if d.month == int(month)]
 
-    # 確保所有範本中的醫師都存在於當月的提交清單中
-    # 這樣總醫師才能看到完整的預設清單
-    for name, template in DOCTOR_TEMPLATE.items():
-        if name not in DOCTOR_SCHEDULE_SUBMISSIONS[month_key]:
-            DOCTOR_SCHEDULE_SUBMISSIONS[month_key][name] = {
-                "days_off": [],
-                "area": template.get("area", "A"),
-                "points_limit": template.get("points_limit", 8),
-                "submitted": False,
-                "is_template": True # 標記這是從範本來的預設資料
-            }
+    # 只有在 debug 模式下，才自動載入範本中的醫師資料
+    if is_debug_mode:
+        for name, template in DOCTOR_TEMPLATE.items():
+            if name not in DOCTOR_SCHEDULE_SUBMISSIONS[month_key]:
+                DOCTOR_SCHEDULE_SUBMISSIONS[month_key][name] = {
+                    "days_off": [],
+                    "area": template.get("area", "A"),
+                    "points_limit": template.get("points_limit", 8),
+                    "submitted": False,
+                    "is_template": True
+                }
 
     response_data = {
         "submissions": DOCTOR_SCHEDULE_SUBMISSIONS.get(month_key, {}),
         "holidays": holiday_list,
-        "doctor_template": DOCTOR_TEMPLATE # 將範本資料也傳給前端
+        "doctor_template": DOCTOR_TEMPLATE
     }
     return jsonify(response_data)
 
+# submit_days_off, update_doctor_settings, run_scheduler_endpoint 路由保持不變
 @app.route('/api/submit_days_off', methods=['POST'])
 def submit_days_off():
     data = request.json
@@ -154,9 +154,7 @@ def submit_days_off():
     days_off = data.get('daysOff', [])
     month_key = get_month_key(year, month)
 
-    # 不論醫師之前是否存在，都更新或建立他的資料
     if doc_name:
-        # 如果醫師是第一次提交，且存在於範本中，則帶入範本設定
         if doc_name not in DOCTOR_SCHEDULE_SUBMISSIONS[month_key] and doc_name in DOCTOR_TEMPLATE:
             template = DOCTOR_TEMPLATE[doc_name]
             DOCTOR_SCHEDULE_SUBMISSIONS[month_key][doc_name] = {
@@ -164,11 +162,10 @@ def submit_days_off():
                 "points_limit": template.get("points_limit", 8),
             }
         
-        # 更新或新增預休資料
         DOCTOR_SCHEDULE_SUBMISSIONS[month_key][doc_name].update({
             'days_off': days_off,
             'submitted': True,
-            'is_template': False # 一旦提交，就不是範本狀態了
+            'is_template': False
         })
         
         save_data(DOCTOR_SCHEDULE_SUBMISSIONS, DATA_FILE)
@@ -186,13 +183,10 @@ def update_doctor_settings():
     if not settings:
         return jsonify({'status': 'error', 'message': '沒有設定資料'}), 400
         
-    # 直接用新的設定覆蓋當月的醫師資料
-    # 這邊不再需要檢查醫師是否存在，因為前端會傳來完整的列表
     DOCTOR_SCHEDULE_SUBMISSIONS[month_key] = defaultdict(dict, settings)
     
     save_data(DOCTOR_SCHEDULE_SUBMISSIONS, DATA_FILE)
     return jsonify({'status': 'success', 'message': '醫師設定已成功儲存！'})
-
 
 @app.route('/api/run_scheduler')
 def run_scheduler_endpoint():
@@ -201,24 +195,19 @@ def run_scheduler_endpoint():
         month = int(request.args.get('month'))
         month_key = get_month_key(year, month)
         
-        # 1. 取得當前月份的醫師設定
         current_month_settings = DOCTOR_SCHEDULE_SUBMISSIONS.get(month_key, {})
         if not current_month_settings:
             return Response(json.dumps({"status": "error", "message": "當月無任何醫師設定，請先儲存設定。"}), 
                             mimetype='application/json', status=400)
 
-        # 2. 自動化取得上個月的班表情況
         prev_month_date = datetime(year, month, 1) - timedelta(days=1)
         prev_month_key = get_month_key(prev_month_date.year, prev_month_date.month)
         prev_month_schedule = DOCTOR_SCHEDULE_SUBMISSIONS.get(prev_month_key, {}).get("final_schedule", {})
 
-        # 3. 組合最終要傳給排班引擎的資料
         doctor_data_for_scheduler = []
         for name, info in current_month_settings.items():
-            # final_schedule 是排班完後儲存的結果，如果沒有就不處理
             if name == "final_schedule": continue
 
-            # 檢查上月最後兩天班表
             last_month_duty_day = 0
             if prev_month_schedule and name in prev_month_schedule:
                 last_day_of_prev_month = prev_month_date.day
@@ -233,19 +222,18 @@ def run_scheduler_endpoint():
                 '區域': info.get('area', 'A'),
                 '點數上限': info.get('points_limit', 8),
                 '不可排班日': info.get('days_off', []),
-                '上月班別日': last_month_duty_day # 0 表示上月最後兩天無班
+                '上月班別日': last_month_duty_day
             })
 
         q = Queue()
 
         def event_stream():
+            yield "data: 連線已建立，正在等待求解器啟動...\n\n"
             while True:
                 log_entry = q.get()
                 if log_entry == "DONE_SUCCESS":
-                    # 排班成功後，將最終班表存回 data.json
                     final_result = q.get()
                     if 'schedule' in final_result:
-                        # 將 dictionary 的 key 從 int 轉為 str，以符合 JSON 格式
                         final_schedule_dict = {doc: {str(day): area for day, area in schedule.items()} 
                                                for doc, schedule in final_result['schedule'].items()}
                         DOCTOR_SCHEDULE_SUBMISSIONS[month_key]['final_schedule'] = final_schedule_dict
@@ -253,13 +241,13 @@ def run_scheduler_endpoint():
                     
                     json_data = json.dumps(final_result)
                     yield f"event: DONE\ndata: {json_data}\n\n"
-                    break # 結束 stream
+                    break
 
                 elif log_entry == "DONE_ERROR":
                     error_result = q.get()
                     json_data = json.dumps(error_result)
                     yield f"event: DONE\ndata: {json_data}\n\n"
-                    break # 結束 stream
+                    break
                 
                 elif isinstance(log_entry, str):
                     yield f"data: {log_entry}\n\n"
@@ -268,11 +256,6 @@ def run_scheduler_endpoint():
         return Response(event_stream(), mimetype='text/event-stream')
 
     except Exception as e:
-        # 處理 API 自身的錯誤
         error_payload = {"status": "error", "message": f"API 內部錯誤: {str(e)}"}
         json_data = json.dumps(error_payload)
         return Response(f"event: DONE\ndata: {json_data}\n\n", mimetype='text/event-stream')
-
-# if __name__ == '__main__':
-#     # 這段主要用於本地開發，Render/Gunicorn 會用別的方式啟動
-#     app.run(host='0.0.0.0', port=int(os.environ.get('PORT', 5000)), debug=True)

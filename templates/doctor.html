@@ -28,11 +28,12 @@
                             <div class="card-body">
                                 <h5 class="card-title" id="info-card-name"></h5>
                                 <p class="card-text mb-1">
-                                    <i class="bi bi-calendar-check"></i> 歡迎使用排休系統
+                                    <i class="bi-calendar-check-fill"></i>
+                                    預休點數: <span id="days-off-points" class="fw-bold">0</span>
                                 </p>
-                                <p class="card-text">
-                                   <small class="text-muted">請在下方日曆劃記預休日期</small>
-                                </p>
+                                <div id="points-warning" class="alert alert-warning p-2 mt-2 d-none" role="alert">
+                                    <small><i class="bi bi-exclamation-triangle-fill"></i> 已超過建議 4 點</small>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -56,10 +57,9 @@
                         <div class="card-header d-flex justify-content-between align-items-center">
                             <h5 id="calendar-title" class="mb-0"></h5>
                             <div>
-                                <span class="badge bg-light text-dark border me-2">可排休</span>
-                                <span class="badge" style="background-color: #FFDDC1; color: #5f3f00;">國定假日</span>
+                                <span class="badge bg-light text-dark border me-2">平日 (1點)</span>
+                                <span class="badge" style="background-color: #FFDDC1; color: #5f3f00;">假日 (2點)</span>
                                 <span class="badge bg-success ms-2">已選定</span>
-                                <span class="badge bg-secondary ms-2">非本月</span>
                             </div>
                         </div>
                         <div class="card-body">
@@ -78,6 +78,7 @@
         </div>
     </div>
 
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script src="{{ url_for('static', filename='js/main.js') }}"></script>
 </body>
 </html>
