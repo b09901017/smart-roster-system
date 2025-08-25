@@ -1,5 +1,5 @@
 # --------------------------------------------------------------------------
-# 智慧排班系統 - Flask 網頁應用程式 (v2.2.1 - Debug 面板優化版)
+# 智慧排班系統 - Flask 網頁應用程式 (v2.2.2 - 錯誤修復與最終版)
 # --------------------------------------------------------------------------
 import os
 import io
@@ -14,7 +14,7 @@ import holidays
 
 from scheduler import solve_schedule_web
 
-# ... (應用程式設定和輔助函式，保持不變) ...
+# --- 應用程式設定 ---
 app = Flask(__name__)
 app.config['SEND_FILE_MAX_AGE_DEFAULT'] = 0
 DATA_DIR = os.environ.get('RENDER_DISK_PATH', '.')
@@ -22,11 +22,16 @@ DATA_FILE = os.path.join(DATA_DIR, 'data.json')
 DOCTOR_TEMPLATE_FILE = os.path.join(DATA_DIR, 'doctor_template.json')
 OUTPUT_DIR = os.path.join(DATA_DIR, 'output')
 if not os.path.exists(OUTPUT_DIR): os.makedirs(OUTPUT_DIR)
+
+# --- 全域資料與輔助函式 ---
 DOCTOR_SCHEDULE_SUBMISSIONS = defaultdict(lambda: defaultdict(dict))
 DOCTOR_TEMPLATE = {}
+
 def get_month_key(year, month): return f"{year}-{str(month).zfill(2)}"
+
 def save_data(data, file_path):
     with open(file_path, 'w', encoding='utf-8') as f: json.dump(data, f, ensure_ascii=False, indent=4)
+
 def load_data(file_path, default_factory=None):
     if os.path.exists(file_path):
         with open(file_path, 'r', encoding='utf-8') as f:
@@ -39,6 +44,7 @@ def load_data(file_path, default_factory=None):
                 return loaded_data
             except json.JSONDecodeError: return default_factory() if default_factory else {}
     return default_factory() if default_factory else {}
+
 def initialize_doctor_template():
     global DOCTOR_TEMPLATE
     if not os.path.exists(DOCTOR_TEMPLATE_FILE):
@@ -68,8 +74,6 @@ def get_schedule_data(year, month):
     tw_holidays = holidays.TW(years=int(year))
     holiday_list = [d.day for d in tw_holidays if d.month == int(month)]
     
-    # 正常模式下，就是單純讀取現有資料
-    # 「載入範本」這個動作會由前端的 debug 按鈕觸發
     response_data = {
         "submissions": DOCTOR_SCHEDULE_SUBMISSIONS.get(month_key, {}),
         "holidays": holiday_list,
@@ -77,13 +81,11 @@ def get_schedule_data(year, month):
     }
     return jsonify(response_data)
 
-# 【新增】專門用來清除當月資料的 API
 @app.route('/api/clear_month_data', methods=['POST'])
 def clear_month_data():
     data = request.json
     year, month = data.get('year'), data.get('month')
     month_key = get_month_key(year, month)
-
     if month_key in DOCTOR_SCHEDULE_SUBMISSIONS:
         del DOCTOR_SCHEDULE_SUBMISSIONS[month_key]
         save_data(DOCTOR_SCHEDULE_SUBMISSIONS, DATA_FILE)
@@ -91,7 +93,6 @@ def clear_month_data():
     else:
         return jsonify({'status': 'success', 'message': f'{month_key} 本來就沒有資料。'})
 
-# ... (submit_days_off, update_doctor_settings, run_scheduler_endpoint 保持不變) ...
 @app.route('/api/submit_days_off', methods=['POST'])
 def submit_days_off():
     data = request.json
@@ -123,7 +124,9 @@ def run_scheduler_endpoint():
         year, month = int(request.args.get('year')), int(request.args.get('month'))
         month_key = get_month_key(year, month)
         current_month_settings = DOCTOR_SCHEDULE_SUBMISSIONS.get(month_key, {})
-        if not current_month_settings: return Response(json.dumps({"status": "error", "message": "當月無任何醫師設定"}), mimetype='application/json', status=400)
+        if not current_month_settings or all(k == 'final_schedule' for k in current_month_settings.keys()):
+             return Response(f"event: DONE\ndata: {json.dumps({'status': 'error', 'message': '當月無任何醫師設定，無法排班。'})}\n\n", mimetype='text/event-stream')
+        
         prev_month_date = datetime(year, month, 1) - timedelta(days=1)
         prev_month_key = get_month_key(prev_month_date.year, prev_month_date.month)
         prev_month_schedule = DOCTOR_SCHEDULE_SUBMISSIONS.get(prev_month_key, {}).get("final_schedule", {})
@@ -137,6 +140,7 @@ def run_scheduler_endpoint():
                 if str(last_day_of_prev_month) in doc_prev_schedule: last_month_duty_day = last_day_of_prev_month
                 elif str(last_day_of_prev_month - 1) in doc_prev_schedule: last_month_duty_day = last_day_of_prev_month - 1
             doctor_data_for_scheduler.append({'醫師姓名': name, '區域': info.get('area', 'A'), '點數上限': info.get('points_limit', 8), '不可排班日': info.get('days_off', []), '上月班別日': last_month_duty_day})
+        
         q = Queue()
         def event_stream():
             yield "data: 連線已建立...\n\n"
@@ -155,7 +159,9 @@ def run_scheduler_endpoint():
                     yield f"event: DONE\ndata: {json.dumps(error_result)}\n\n"
                     break
                 elif isinstance(log_entry, str): yield f"data: {log_entry}\n\n"
+        
         threading.Thread(target=solve_schedule_web, args=(doctor_data_for_scheduler, year, month, q, OUTPUT_DIR)).start()
         return Response(event_stream(), mimetype='text/event-stream')
+    
     except Exception as e:
         return Response(f"event: DONE\ndata: {json.dumps({'status': 'error', 'message': f'API 內部錯誤: {e}'})}\n\n", mimetype='text/event-stream')

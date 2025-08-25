@@ -1,13 +1,13 @@
 document.addEventListener('DOMContentLoaded', function () {
     const path = window.location.pathname;
     if (path.startsWith('/doctor')) {
-        initDoctorPage(); // 醫師頁面 JS 保持不變
+        initDoctorPage();
     } else if (path.startsWith('/admin')) {
-        initAdminPage(); // 主要修改這裡
+        initAdminPage();
     }
 });
 
-// --- Doctor Page Logic (v2.2.1 - 保持不變) ---
+// --- Doctor Page Logic (v2.2.2 - 保持不變) ---
 function initDoctorPage() {
     const nameInput = document.getElementById('doctor-name-input');
     const loginBtn = document.getElementById('doctor-login-btn');
@@ -131,21 +131,47 @@ function initDoctorPage() {
     }
 }
 
-// --- Admin Page Logic (v2.2.1) ---
+// --- Admin Page Logic (v2.2.2) ---
 function initAdminPage() {
-    // --- Element Variables & State ---
     const yearSelect = document.getElementById('admin-year-select');
     const monthSelect = document.getElementById('admin-month-select');
     const settingsTbody = document.getElementById('doctor-settings-tbody');
-    // ... (其他變數宣告保持不變)
-    const loadTemplateBtn = document.getElementById('load-template-btn'); // Debug 按鈕
-    const clearMonthBtn = document.getElementById('clear-month-btn');   // Debug 按鈕
-    
+    const loadTemplateBtn = document.getElementById('load-template-btn');
+    const clearMonthBtn = document.getElementById('clear-month-btn');   
+    const addDoctorBtn = document.getElementById('add-doctor-btn');
+    const saveSettingsBtn = document.getElementById('save-settings-btn');
+    const runButton = document.getElementById('run-scheduler-btn');
+    const helpText = document.getElementById('run-scheduler-help');
+    const logCardBody = document.getElementById('log-card-body');
+    const toggleLogBtn = document.getElementById('toggle-log-btn');
+    const resultsSection = document.getElementById('results-section');
+    const settingsMonthTitle = document.getElementById('settings-month-title');
+    const fullscreenBtn = document.getElementById('fullscreen-btn');
+    const fullscreenModal = new bootstrap.Modal(document.getElementById('fullscreen-modal'));
+    const logTimer = document.getElementById('log-timer');
+    const scheduleFilters = document.getElementById('schedule-filters');
+    const areaFilter = document.getElementById('area-filter');
+    const dateFilter = document.getElementById('date-filter');
+    const resetFiltersBtn = document.getElementById('reset-filters-btn');
+    const settingsCollapse = new bootstrap.Collapse(document.getElementById('doctor-settings-collapse'), { toggle: false });
+
     let currentYear = new Date().getFullYear();
     let currentMonth = new Date().getMonth() + 2;
     if (currentMonth > 12) { currentMonth = 1; currentYear++; }
     
-    // --- Debug Panel Listeners ---
+    let eventSource = null, logTimerInterval = null, fullScheduleData = null;
+    let doctorTemplate = {};
+
+    for (let y = currentYear; y <= currentYear + 2; y++) yearSelect.add(new Option(y, y));
+    for (let m = 1; m <= 12; m++) monthSelect.add(new Option(`${m} 月`, m));
+    yearSelect.value = currentYear; monthSelect.value = currentMonth;
+    
+    [yearSelect, monthSelect].forEach(el => el.addEventListener('change', () => {
+        currentYear = parseInt(yearSelect.value); currentMonth = parseInt(monthSelect.value);
+        loadDoctorSettings();
+        runButton.disabled = true; helpText.textContent = '月份已變更，請重新儲存設定。';
+    }));
+    
     loadTemplateBtn.addEventListener('click', () => {
         if (confirm("這將會用預設的 20 位醫師資料覆蓋目前的醫師設定，確定要載入嗎？")) {
             loadTemplateData();
@@ -163,7 +189,7 @@ function initAdminPage() {
                 const result = await response.json();
                 alert(result.message);
                 if (result.status === 'success') {
-                    loadDoctorSettings(); // 重新載入，畫面會變空的
+                    loadDoctorSettings();
                 }
             } catch (error) {
                 alert('清除資料時發生錯誤。');
@@ -171,9 +197,32 @@ function initAdminPage() {
         }
     });
 
-    // --- Core Functions ---
+    addDoctorBtn.addEventListener('click', () => {
+        const newName = prompt("請輸入要新增的醫師姓名：");
+        if (newName && newName.trim() !== "") {
+            const name = newName.trim();
+            const template = doctorTemplate[name] || {};
+            const newRowData = { name: name, data: { days_off: [], area: template.area || 'A', points_limit: template.points_limit || 8, submitted: false } };
+            renderSettingsRow(newRowData); sortSettingsTable();
+        }
+    });
+    
+    saveSettingsBtn.addEventListener('click', saveDoctorSettings);
+    runButton.addEventListener('click', runScheduler);
+    toggleLogBtn.addEventListener('click', () => logCardBody.classList.toggle('minimized'));
+    fullscreenBtn.addEventListener('click', () => fullscreenModal.show());
+    [areaFilter, dateFilter].forEach(el => el.addEventListener('change', applyTableFilters));
+    resetFiltersBtn.addEventListener('click', () => { areaFilter.value = 'all'; dateFilter.value = 'all'; applyTableFilters(); });
+    
+    new Sortable(settingsTbody, { animation: 150, handle: '.drag-handle', onEnd: function (evt) {
+        const movedRow = evt.item, previousRow = movedRow.previousElementSibling, nextRow = movedRow.nextElementSibling;
+        let newArea = null;
+        if (previousRow) { newArea = previousRow.querySelector('.area-select').value; }
+        else if (nextRow) { newArea = nextRow.querySelector('.area-select').value; }
+        if (newArea) { movedRow.querySelector('.area-select').value = newArea; }
+    }});
+
     async function loadDoctorSettings() {
-        const settingsMonthTitle = document.getElementById('settings-month-title');
         settingsMonthTitle.textContent = `${currentYear} 年 ${currentMonth} 月`;
         try {
             const response = await fetch(`/api/schedule_data/${currentYear}/${currentMonth}`);
@@ -198,75 +247,19 @@ function initAdminPage() {
             alert("讀取醫師設定失敗，請稍後再試。");
         }
     }
-
+    
     function loadTemplateData() {
-        settingsTbody.innerHTML = ''; // 清空現有列表
+        settingsTbody.innerHTML = '';
         Object.entries(doctorTemplate).forEach(([name, template]) => {
             const rowData = {
                 name: name,
-                data: {
-                    days_off: [],
-                    area: template.area || 'A',
-                    points_limit: template.points_limit || 8,
-                    submitted: false // 範本載入時都算未提交
-                }
+                data: { days_off: [], area: template.area || 'A', points_limit: template.points_limit || 8, submitted: false }
             };
             renderSettingsRow(rowData);
         });
         sortSettingsTable();
         alert("預設醫師範本已成功載入！請記得儲存設定。");
     }
-
-    // --- (其他所有 Admin JS 函式，如 renderSettingsRow, saveDoctorSettings 等，都保持跟 V2.2.0/V2.2.1 一樣，無需修改) ---
-    const addDoctorBtn = document.getElementById('add-doctor-btn');
-    const saveSettingsBtn = document.getElementById('save-settings-btn');
-    const runButton = document.getElementById('run-scheduler-btn');
-    const helpText = document.getElementById('run-scheduler-help');
-    const logCardBody = document.getElementById('log-card-body');
-    const toggleLogBtn = document.getElementById('toggle-log-btn');
-    const resultsSection = document.getElementById('results-section');
-    const fullscreenBtn = document.getElementById('fullscreen-btn');
-    const fullscreenModal = new bootstrap.Modal(document.getElementById('fullscreen-modal'));
-    const logTimer = document.getElementById('log-timer');
-    const scheduleFilters = document.getElementById('schedule-filters');
-    const areaFilter = document.getElementById('area-filter');
-    const dateFilter = document.getElementById('date-filter');
-    const resetFiltersBtn = document.getElementById('reset-filters-btn');
-    const settingsCollapse = new bootstrap.Collapse(document.getElementById('doctor-settings-collapse'), { toggle: false });
-    let eventSource = null, logTimerInterval = null, fullScheduleData = null;
-    let doctorTemplate = {};
-
-    for (let y = currentYear; y <= currentYear + 2; y++) yearSelect.add(new Option(y, y));
-    for (let m = 1; m <= 12; m++) monthSelect.add(new Option(`${m} 月`, m));
-    yearSelect.value = currentYear; monthSelect.value = currentMonth;
-    
-    [yearSelect, monthSelect].forEach(el => el.addEventListener('change', () => {
-        currentYear = parseInt(yearSelect.value); currentMonth = parseInt(monthSelect.value);
-        loadDoctorSettings();
-        runButton.disabled = true; helpText.textContent = '月份已變更，請重新儲存設定。';
-    }));
-    addDoctorBtn.addEventListener('click', () => {
-        const newName = prompt("請輸入要新增的醫師姓名：");
-        if (newName && newName.trim() !== "") {
-            const name = newName.trim();
-            const template = doctorTemplate[name] || {};
-            const newRowData = { name: name, data: { days_off: [], area: template.area || 'A', points_limit: template.points_limit || 8, submitted: false } };
-            renderSettingsRow(newRowData); sortSettingsTable();
-        }
-    });
-    saveSettingsBtn.addEventListener('click', saveDoctorSettings);
-    runButton.addEventListener('click', runScheduler);
-    toggleLogBtn.addEventListener('click', () => logCardBody.classList.toggle('minimized'));
-    fullscreenBtn.addEventListener('click', () => fullscreenModal.show());
-    [areaFilter, dateFilter].forEach(el => el.addEventListener('change', applyTableFilters));
-    resetFiltersBtn.addEventListener('click', () => { areaFilter.value = 'all'; dateFilter.value = 'all'; applyTableFilters(); });
-    new Sortable(settingsTbody, { animation: 150, handle: '.drag-handle', onEnd: function (evt) {
-        const movedRow = evt.item, previousRow = movedRow.previousElementSibling, nextRow = movedRow.nextElementSibling;
-        let newArea = null;
-        if (previousRow) { newArea = previousRow.querySelector('.area-select').value; }
-        else if (nextRow) { newArea = nextRow.querySelector('.area-select').value; }
-        if (newArea) { movedRow.querySelector('.area-select').value = newArea; }
-    }});
 
     function renderSettingsRow({ name, data }) {
         const row = settingsTbody.insertRow(); row.dataset.doctorName = name;
@@ -284,11 +277,13 @@ function initAdminPage() {
         actionCell.innerHTML = `<button class="btn btn-sm btn-outline-danger remove-btn" title="移除此醫師"><i class="bi bi-trash-fill"></i></button>`;
         row.querySelector('.remove-btn').addEventListener('click', () => { if (confirm(`確定要從本月排班中移除 ${name} 嗎？`)) { row.remove(); } });
     }
+
     function sortSettingsTable() {
         const rows = Array.from(settingsTbody.querySelectorAll('tr'));
         rows.sort((a, b) => { const areaA = a.querySelector('.area-select').value, areaB = b.querySelector('.area-select').value; if (areaA < areaB) return -1; if (areaA > areaB) return 1; return 0; });
         rows.forEach(row => settingsTbody.appendChild(row));
     }
+
     async function saveDoctorSettings() {
         const settingsPayload = {}; const rows = settingsTbody.querySelectorAll('tr'); let hasError = false;
         rows.forEach(row => {
@@ -306,7 +301,9 @@ function initAdminPage() {
         } catch (error) { alert('儲存時發生網路錯誤。'); }
         finally { saveSettingsBtn.disabled = false; saveSettingsBtn.innerHTML = `<i class="bi bi-save-fill"></i> 儲存醫師設定`; }
     }
+
     function formatTime(ms) { const seconds = Math.floor(ms / 1000); const m = Math.floor(seconds / 60); const s = seconds % 60; return m > 0 ? `${m}m ${s}s` : `${s}s`; }
+    
     function runScheduler() {
         if (eventSource) eventSource.close(); if (logTimerInterval) clearInterval(logTimerInterval);
         runButton.disabled = true; saveSettingsBtn.disabled = true;
@@ -322,8 +319,10 @@ function initAdminPage() {
         eventSource.addEventListener('DONE', e => handleDoneEvent(JSON.parse(e.data), startTime));
         eventSource.onerror = () => { document.getElementById('log-output').textContent += '\n與伺服器連線中斷或發生錯誤。'; eventSource.close(); resetRunButton(); };
     }
+    
     let isFirstLog = true;
     function handleLogMessage(data) { const logOutput = document.getElementById('log-output'); if (isFirstLog) { logOutput.textContent = ''; isFirstLog = false; } logOutput.textContent += data + '\n'; logOutput.scrollTop = logOutput.scrollHeight; }
+    
     function handleDoneEvent(data, startTime) {
         clearInterval(logTimerInterval); logTimer.innerHTML = `✅ ${formatTime(Date.now() - startTime)}`;
         logTimer.classList.remove('bg-secondary'); logTimer.classList.add('bg-success');
@@ -334,7 +333,9 @@ function initAdminPage() {
         } else { document.getElementById('log-output').textContent += `\n排班失敗: ${data.message}`; alert(`排班失敗: ${data.message}`); }
         resetRunButton(); eventSource.close();
     }
+    
     function resetRunButton() { runButton.disabled = false; saveSettingsBtn.disabled = false; runButton.innerHTML = '<i class="bi bi-calculator-fill"></i> 一鍵排班'; }
+    
     function displayResults(data) {
         resultsSection.classList.remove('d-none'); const scoresList = document.getElementById('final-scores-list'); scoresList.innerHTML = '';
         for (const [key, value] of Object.entries(data.final_scores)) {
@@ -347,6 +348,7 @@ function initAdminPage() {
         downloadBtn.href = data.excel_url; downloadBtn.style.display = 'inline-block';
         fullscreenBtn.style.display = 'inline-block'; scheduleFilters.style.display = 'flex';
     }
+    
     function applyTableFilters() {
         if (!fullScheduleData) return;
         const mainTable = renderScheduleTable(fullScheduleData);
@@ -354,6 +356,7 @@ function initAdminPage() {
         const fullscreenContainer = document.getElementById('fullscreen-schedule-render-area');
         fullscreenContainer.innerHTML = ''; fullscreenContainer.appendChild(mainTable.cloneNode(true));
     }
+    
     function renderScheduleTable(data) {
         const area = areaFilter.value, dateRange = dateFilter.value;
         const filteredDoctors = data.doctors.filter(doc => area === 'all' || data.doctor_info[doc].區域 === area);
@@ -383,5 +386,6 @@ function initAdminPage() {
         });
         return table;
     }
+    
     loadDoctorSettings();
 }
