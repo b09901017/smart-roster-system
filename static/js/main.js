@@ -7,8 +7,9 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 });
 
-// --- Doctor Page Logic (v2.3.2) ---
+// --- Doctor Page Logic (v2.4.0) ---
 function initDoctorPage() {
+    // --- (程式碼與 V2.3.2 完全相同，此處為求完整性而保留) ---
     const nameInput = document.getElementById('doctor-name-input');
     const loginBtn = document.getElementById('doctor-login-btn');
     const yearSelect = document.getElementById('year-select');
@@ -82,7 +83,7 @@ function initDoctorPage() {
         dragStartDay = null;
         updatePointsCount();
     });
-    calendarDiv.addEventListener('click', e => {
+     calendarDiv.addEventListener('click', e => {
         if (isCalendarReadOnly || isDragging || !e.target.classList.contains('available')) return;
         e.target.classList.toggle('selected');
         updatePointsCount();
@@ -148,7 +149,7 @@ function initDoctorPage() {
     }
 }
 
-// --- Admin Page Logic (v2.3.2) ---
+// --- Admin Page Logic (v2.4.0) ---
 function initAdminPage() {
     const yearSelect = document.getElementById('admin-year-select');
     const monthSelect = document.getElementById('admin-month-select');
@@ -176,7 +177,7 @@ function initAdminPage() {
     let currentMonth = new Date().getMonth() + 1;
     let eventSource = null, logTimerInterval = null, fullScheduleData = null;
     let doctorTemplate = {};
-    let isFirstLog = true; // 【修復】將 isFirstLog 移至 runScheduler 外部
+    let isFirstLog = true;
 
     for (let y = currentYear; y <= currentYear + 2; y++) yearSelect.add(new Option(y, y));
     for (let m = 1; m <= 12; m++) monthSelect.add(new Option(`${m} 月`, m));
@@ -256,7 +257,7 @@ function initAdminPage() {
         runButton.disabled = true; saveSettingsBtn.disabled = true;
         runButton.innerHTML = `<span class="spinner-border spinner-border-sm"></span> 運算中...`;
         logCardBody.classList.remove('minimized');
-        isFirstLog = true; // 重置 isFirstLog 狀態
+        isFirstLog = true;
         handleLogMessage('正在連接後端排班引擎...');
         logTimer.textContent = '0s'; logTimer.classList.remove('bg-success'); logTimer.classList.add('bg-secondary');
         const startTime = Date.now();

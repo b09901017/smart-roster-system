@@ -1,6 +1,11 @@
 # --------------------------------------------------------------------------
-# 智慧排班系統 - Flask 網頁應用程式 (v2.3.1 - 穩定版)
+# 智慧排班系統 - Flask 網頁應用程式 (v2.4.0 - 最終穩定版)
 # --------------------------------------------------------------------------
+
+# 【修復】在所有 import 之前，最優先執行猴子補丁，以確保所有標準庫都被正確替換
+import gevent.monkey
+gevent.monkey.patch_all()
+
 import os
 import io
 import pandas as pd
@@ -9,12 +14,12 @@ import json
 import threading
 from datetime import datetime, timedelta
 from collections import defaultdict
-from queue import Queue
+from queue import Queue # 現在這個 Queue 會被 gevent 自動替換成兼容版本
 import holidays
 
 from scheduler import solve_schedule_web
 
-# --- 應用程式設定 ---
+# --- (應用程式設定與其他函式，與之前版本完全相同) ---
 app = Flask(__name__)
 app.config['SEND_FILE_MAX_AGE_DEFAULT'] = 0
 DATA_DIR = os.environ.get('RENDER_DISK_PATH', '.')
@@ -22,8 +27,6 @@ DATA_FILE = os.path.join(DATA_DIR, 'data.json')
 DOCTOR_TEMPLATE_FILE = os.path.join(DATA_DIR, 'doctor_template.json')
 OUTPUT_DIR = os.path.join(DATA_DIR, 'output')
 if not os.path.exists(OUTPUT_DIR): os.makedirs(OUTPUT_DIR)
-
-# --- 全域資料與輔助函式 ---
 DOCTOR_SCHEDULE_SUBMISSIONS = defaultdict(lambda: defaultdict(dict))
 DOCTOR_TEMPLATE = {}
 
@@ -48,43 +51,37 @@ def load_data(file_path, default_factory=None):
 def initialize_doctor_template():
     global DOCTOR_TEMPLATE
     if not os.path.exists(DOCTOR_TEMPLATE_FILE):
-        csv_data = """
-醫師姓名,區域,點數上限,不可排班日
+        csv_data = """醫師姓名,區域,點數上限,不可排班日
 如,A,8,"26,27"
 秀,A,8,"1,2,5,6"
-橋,A,6,"1,2,3,4,5,6,7,8,9,19,20"
+橋,A,6,"1,2,3,4"
 君,A,6,"4"
 翔,A,6,"1,3,4"
-航,A,8,"1,14,15,16,17,18,19,20"
+航,A,8,"1,14,15,16"
 淇,B,8,"1,2,25,28"
 慈,B,8,"3,4"
 恩,B,8,""
 屹,B,8,"4,5"
 軒,B,6,"2,3,5"
 佑,C,8,""
-翰,C,6,"1,2,3,4,5,6,7,8,9,13,27"
-潔,C,5,"16,17,18,19,20,21,22,23,24,25,26,27,28,29,30"
-諺,C,5,"1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,26"
+翰,C,6,"1,2,3,4"
+潔,C,5,"16,17,18,19"
+諺,C,5,"1,2,3,4"
 宣,C,8,"26,27"
-韶,C,8,"2,3,4,5,6,7,8"
-然,I,8,"1,2,3,4,5,6"
+韶,C,8,"2,3,4,5"
+然,I,8,"1,2,3,4"
 偉,I,8,"1,2,4,5"
-煒,I,7,"21,22,23,24,25,26,27,28,29,30"
+煒,I,7,"21,22,23,24"
 """
         df = pd.read_csv(io.StringIO(csv_data)).apply(lambda x: x.str.strip() if x.dtype == "object" else x)
         for _, row in df.iterrows():
             days_off_str = str(row['不可排班日'])
             days_off_list = [int(d) for d in days_off_str.split(',') if d.strip().isdigit()]
-            DOCTOR_TEMPLATE[row['醫師姓名']] = {
-                'area': row['區域'],
-                'points_limit': int(row['點數上限']),
-                'days_off': days_off_list
-            }
+            DOCTOR_TEMPLATE[row['醫師姓名']] = { 'area': row['區域'], 'points_limit': int(row['點數上限']), 'days_off': days_off_list }
         save_data(DOCTOR_TEMPLATE, DOCTOR_TEMPLATE_FILE)
     else: DOCTOR_TEMPLATE = load_data(DOCTOR_TEMPLATE_FILE)
 
 def pre_populate_schedules_if_empty():
-    """僅在 data.json 完全為空時，為範本醫師預填資料"""
     if not DOCTOR_SCHEDULE_SUBMISSIONS:
         today = datetime.today()
         for i in range(0, 3):
@@ -92,17 +89,13 @@ def pre_populate_schedules_if_empty():
             year, month = target_date.year, target_date.month
             month_key = get_month_key(year, month)
             for name, template in DOCTOR_TEMPLATE.items():
-                DOCTOR_SCHEDULE_SUBMISSIONS[month_key][name] = {
-                    "days_off": template.get('days_off', []), "area": template.get("area", "A"),
-                    "points_limit": template.get("points_limit", 8), "submitted": True, "is_template": True
-                }
+                DOCTOR_SCHEDULE_SUBMISSIONS[month_key][name] = { "days_off": template.get('days_off', []), "area": template.get("area", "A"), "points_limit": template.get("points_limit", 8), "submitted": True, "is_template": True }
         save_data(DOCTOR_SCHEDULE_SUBMISSIONS, DATA_FILE)
 
 DOCTOR_SCHEDULE_SUBMISSIONS = load_data(DATA_FILE, lambda: defaultdict(dict))
 initialize_doctor_template()
 pre_populate_schedules_if_empty()
 
-# --- Flask 路由 ---
 @app.route('/')
 def index(): return render_template('index.html')
 @app.route('/doctor')
@@ -111,8 +104,6 @@ def doctor_portal(): return render_template('doctor.html')
 def admin_portal(): return render_template('admin.html')
 @app.route('/output/<filename>')
 def serve_output_file(filename): return send_from_directory(OUTPUT_DIR, filename, as_attachment=True)
-
-# --- API 端點 ---
 @app.route('/api/schedule_data/<year>/<month>')
 def get_schedule_data(year, month):
     month_key = get_month_key(year, month)
