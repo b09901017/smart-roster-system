@@ -64,7 +64,6 @@ function initDoctorPage() {
         dragStartDay = parseInt(e.target.dataset.day);
         dragToggleState = !e.target.classList.contains('selected');
         e.target.classList.toggle('selected', dragToggleState);
-        updatePointsCount();
     });
 
     calendarDiv.addEventListener('mouseover', e => {
@@ -78,13 +77,18 @@ function initDoctorPage() {
                 cell.classList.toggle('selected', dragToggleState);
             }
         });
-        updatePointsCount();
     });
 
     document.addEventListener('mouseup', () => {
         if (!isDragging) return;
         isDragging = false;
         dragStartDay = null;
+        updatePointsCount();
+    });
+     calendarDiv.addEventListener('click', e => {
+        if (isCalendarReadOnly || isDragging || !e.target.classList.contains('available')) return;
+        e.target.classList.toggle('selected');
+        updatePointsCount();
     });
 
     async function loadAndRenderCalendar() {
