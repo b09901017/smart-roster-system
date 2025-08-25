@@ -7,9 +7,10 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 });
 
-// --- Doctor Page Logic ---
+// --- Doctor Page Logic (v2.0) ---
 function initDoctorPage() {
-    const doctorSelect = document.getElementById('doctor-select');
+    const nameInput = document.getElementById('doctor-name-input');
+    const loginBtn = document.getElementById('doctor-login-btn');
     const yearSelect = document.getElementById('year-select');
     const monthSelect = document.getElementById('month-select');
     const calendarDiv = document.getElementById('calendar');
@@ -19,23 +20,43 @@ function initDoctorPage() {
     const mainContent = document.getElementById('main-content');
     const welcomeMessage = document.getElementById('welcome-message');
 
-    let currentDoctor = null, currentYear = 2025, currentMonth = 1;
+    let currentDoctor = null;
+    let currentYear = new Date().getFullYear();
+    let currentMonth = new Date().getMonth() + 2; // Default to next month
+    if (currentMonth > 12) {
+        currentMonth = 1;
+        currentYear++;
+    }
+
     let isDragging = false, dragStartDay = null, dragToggleState = false;
 
-    for (let y = 2025; y <= 2026; y++) yearSelect.add(new Option(y, y));
+    // Populate year/month selects
+    for (let y = currentYear; y <= currentYear + 1; y++) yearSelect.add(new Option(y, y));
     for (let m = 1; m <= 12; m++) monthSelect.add(new Option(m, m));
-    yearSelect.value = currentYear; monthSelect.value = currentMonth;
+    yearSelect.value = currentYear;
+    monthSelect.value = currentMonth;
 
-    doctorSelect.addEventListener('change', async () => {
-        currentDoctor = doctorSelect.value;
-        if (currentDoctor) {
+    const startSession = () => {
+        const name = nameInput.value.trim();
+        if (name) {
+            currentDoctor = name;
             welcomeMessage.classList.add('d-none');
             mainContent.classList.remove('d-none');
             doctorInfoCard.classList.remove('d-none');
-            await updateDoctorInfo();
-            await loadAndRenderCalendar();
+            document.getElementById('info-card-name').textContent = currentDoctor;
+            nameInput.disabled = true;
+            loginBtn.disabled = true;
+            loadAndRenderCalendar();
+        } else {
+            alert('請輸入您的姓名');
         }
+    };
+    
+    loginBtn.addEventListener('click', startSession);
+    nameInput.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') startSession();
     });
+
 
     [yearSelect, monthSelect].forEach(el => el.addEventListener('change', () => {
         currentYear = parseInt(yearSelect.value);
@@ -44,14 +65,6 @@ function initDoctorPage() {
     }));
 
     submitButton.addEventListener('click', submitDaysOff);
-
-    async function updateDoctorInfo() {
-        const response = await fetch(`/api/doctor_info/${currentDoctor}`);
-        const data = await response.json();
-        document.getElementById('info-card-name').textContent = currentDoctor;
-        document.getElementById('info-card-area').textContent = data.區域;
-        document.getElementById('info-card-points').textContent = data.點數上限;
-    }
 
     async function loadAndRenderCalendar() {
         if (!currentDoctor) return;
@@ -157,17 +170,19 @@ function initDoctorPage() {
     }
 }
 
-// --- Admin Page Logic ---
+// --- Admin Page Logic (v2.0) ---
 function initAdminPage() {
     const yearSelect = document.getElementById('admin-year-select');
     const monthSelect = document.getElementById('admin-month-select');
-    const statusList = document.getElementById('submission-status-list');
+    const settingsTbody = document.getElementById('doctor-settings-tbody');
+    const addDoctorBtn = document.getElementById('add-doctor-btn');
+    const saveSettingsBtn = document.getElementById('save-settings-btn');
     const runButton = document.getElementById('run-scheduler-btn');
     const helpText = document.getElementById('run-scheduler-help');
     const logCardBody = document.getElementById('log-card-body');
     const toggleLogBtn = document.getElementById('toggle-log-btn');
     const resultsSection = document.getElementById('results-section');
-    const statusMonthTitle = document.getElementById('status-month-title');
+    const settingsMonthTitle = document.getElementById('settings-month-title');
     const fullscreenBtn = document.getElementById('fullscreen-btn');
     const fullscreenModal = new bootstrap.Modal(document.getElementById('fullscreen-modal'));
     const logTimer = document.getElementById('log-timer');
@@ -176,18 +191,44 @@ function initAdminPage() {
     const dateFilter = document.getElementById('date-filter');
     const resetFiltersBtn = document.getElementById('reset-filters-btn');
     
-    let currentYear = 2025, currentMonth = 1, eventSource = null, logTimerInterval = null, fullScheduleData = null;
+    let currentYear = new Date().getFullYear();
+    let currentMonth = new Date().getMonth() + 2; // Default to next month
+    if (currentMonth > 12) {
+        currentMonth = 1;
+        currentYear++;
+    }
+    
+    let eventSource = null, logTimerInterval = null, fullScheduleData = null;
 
-    for (let y = 2025; y <= 2026; y++) yearSelect.add(new Option(y, y));
+    for (let y = currentYear; y <= currentYear + 1; y++) yearSelect.add(new Option(y, y));
     for (let m = 1; m <= 12; m++) monthSelect.add(new Option(`${m} 月`, m));
     yearSelect.value = currentYear; monthSelect.value = currentMonth;
 
     [yearSelect, monthSelect].forEach(el => el.addEventListener('change', () => {
         currentYear = parseInt(yearSelect.value);
         currentMonth = parseInt(monthSelect.value);
-        updateSubmissionStatus();
+        loadDoctorSettings();
+        runButton.disabled = true;
+        helpText.textContent = '月份已變更，請重新儲存設定以啟用排班按鈕。';
     }));
 
+    addDoctorBtn.addEventListener('click', () => {
+        const newName = prompt("請輸入要新增的醫師姓名：");
+        if (newName && newName.trim() !== "") {
+            const newRowData = {
+                name: newName.trim(),
+                data: {
+                    days_off: [],
+                    area: 'A',
+                    points_limit: 4,
+                    prev_month_duty: false
+                }
+            };
+            renderSettingsRow(newRowData);
+        }
+    });
+
+    saveSettingsBtn.addEventListener('click', saveDoctorSettings);
     runButton.addEventListener('click', runScheduler);
     toggleLogBtn.addEventListener('click', () => logCardBody.classList.toggle('minimized'));
     fullscreenBtn.addEventListener('click', () => fullscreenModal.show());
@@ -199,35 +240,118 @@ function initAdminPage() {
         applyTableFilters();
     });
 
-    async function updateSubmissionStatus() {
-        statusMonthTitle.textContent = `${currentYear} 年 ${currentMonth} 月`;
+    async function loadDoctorSettings() {
+        settingsMonthTitle.textContent = `${currentYear} 年 ${currentMonth} 月`;
         const response = await fetch(`/api/schedule_data/${currentYear}/${currentMonth}`);
         const data = await response.json();
         
-        statusList.innerHTML = '';
-        const notSubmitted = Object.entries(data.submissions).filter(([_, info]) => !info.submitted);
+        settingsTbody.innerHTML = ''; // Clear table
+        const sortedDoctors = Object.entries(data.submissions).sort((a, b) => a[0].localeCompare(b[0]));
 
-        if (Object.keys(data.submissions).length === 0) {
-            statusList.innerHTML = `<li class="list-group-item">該月份無醫師資料</li>`;
-            runButton.disabled = true;
-            helpText.textContent = '資料錯誤，無法排班。';
-        } else if (notSubmitted.length === 0) {
-            statusList.innerHTML = `<li class="list-group-item list-group-item-success"><i class="bi bi-check-all"></i> 所有醫師皆已提交</li>`;
-            runButton.disabled = false;
-            helpText.textContent = '可以開始排班。';
-        } else {
-            notSubmitted.forEach(([doctor, _]) => {
-                const li = document.createElement('li');
-                li.classList.add('list-group-item', 'd-flex', 'justify-content-between', 'align-items-center');
-                li.textContent = doctor;
-                li.innerHTML += `<span class="badge bg-warning text-dark">尚未提交</span>`;
-                statusList.appendChild(li);
+        if (sortedDoctors.length > 0) {
+            sortedDoctors.forEach(([name, docData]) => {
+                renderSettingsRow({ name, data: docData });
             });
-            runButton.disabled = true;
-            helpText.textContent = `尚有 ${notSubmitted.length} 位醫師未提交。`;
+        } else {
+             settingsTbody.innerHTML = `<tr><td colspan="6" class="text-center text-muted">本月份尚無任何醫師提交預休</td></tr>`;
         }
     }
+
+    function renderSettingsRow({ name, data }) {
+        const row = settingsTbody.insertRow();
+        row.dataset.doctorName = name;
+
+        // Name Cell (editable for newly added)
+        const nameCell = row.insertCell();
+        const isExisting = data.submitted !== undefined;
+        nameCell.innerHTML = `<input type="text" class="form-control form-control-sm" value="${name}" ${isExisting ? 'disabled' : ''}>`;
+
+        // Days Off Cell
+        row.insertCell().textContent = data.days_off ? data.days_off.join(', ') : '未提報';
+
+        // Area Cell
+        const areaCell = row.insertCell();
+        areaCell.innerHTML = `
+            <select class="form-select form-select-sm area-select">
+                <option value="A" ${data.area === 'A' ? 'selected' : ''}>A 區</option>
+                <option value="B" ${data.area === 'B' ? 'selected' : ''}>B 區</option>
+                <option value="C" ${data.area === 'C' ? 'selected' : ''}>C 區</option>
+                <option value="I" ${data.area === 'I' ? 'selected' : ''}>I 區</option>
+            </select>`;
+
+        // Points Limit Cell
+        const pointsCell = row.insertCell();
+        pointsCell.innerHTML = `<input type="number" class="form-control form-control-sm points-input" value="${data.points_limit}" min="0" max="20">`;
+
+        // Prev Month Duty Cell
+        const prevDutyCell = row.insertCell();
+        prevDutyCell.classList.add('text-center');
+        prevDutyCell.innerHTML = `<input class="form-check-input prev-duty-checkbox" type="checkbox" ${data.prev_month_duty ? 'checked' : ''}>`;
     
+        // Actions Cell
+        const actionCell = row.insertCell();
+        actionCell.innerHTML = `<button class="btn btn-sm btn-outline-danger remove-btn"><i class="bi bi-trash-fill"></i></button>`;
+        row.querySelector('.remove-btn').addEventListener('click', () => row.remove());
+    }
+
+    async function saveDoctorSettings() {
+        const settingsPayload = {};
+        const rows = settingsTbody.querySelectorAll('tr');
+        let hasError = false;
+
+        rows.forEach(row => {
+            const nameInput = row.querySelector('input[type="text"]');
+            if (!nameInput) return; // Skip empty rows
+            
+            const name = nameInput.value.trim();
+            if (!name) {
+                alert('醫師姓名不可為空！');
+                nameInput.focus();
+                hasError = true;
+                return;
+            }
+
+            settingsPayload[name] = {
+                days_off: row.cells[1].textContent.split(',').map(d => parseInt(d)).filter(Number.isInteger),
+                area: row.querySelector('.area-select').value,
+                points_limit: parseInt(row.querySelector('.points-input').value),
+                prev_month_duty: row.querySelector('.prev-duty-checkbox').checked,
+                submitted: true // Mark as processed by admin
+            };
+        });
+        
+        if (hasError) return;
+
+        saveSettingsBtn.disabled = true;
+        saveSettingsBtn.innerHTML = `<span class="spinner-border spinner-border-sm"></span> 儲存中...`;
+
+        try {
+            const response = await fetch('/api/update_doctor_settings', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ year: currentYear, month: currentMonth, settings: settingsPayload })
+            });
+            const result = await response.json();
+            if (result.status === 'success') {
+                alert('醫師設定已成功儲存！');
+                runButton.disabled = false;
+                helpText.textContent = '設定已儲存，可以開始排班。';
+            } else {
+                 alert(`儲存失敗：${result.message}`);
+                 runButton.disabled = true;
+                 helpText.textContent = '儲存失敗，無法排班。';
+            }
+        } catch (error) {
+            alert('儲存時發生網路錯誤。');
+        } finally {
+            saveSettingsBtn.disabled = false;
+            saveSettingsBtn.innerHTML = `<i class="bi bi-save-fill"></i> 儲存醫師設定`;
+        }
+    }
+
+    // --- The rest of the functions (runScheduler, formatTime, etc.) are almost identical to v1 ---
+    // --- Only minor changes to adapt to the new workflow ---
+
     function formatTime(ms) {
         const seconds = Math.floor(ms / 1000);
         const m = Math.floor(seconds / 60);
@@ -240,6 +364,7 @@ function initAdminPage() {
         if (logTimerInterval) clearInterval(logTimerInterval);
         
         runButton.disabled = true;
+        saveSettingsBtn.disabled = true;
         runButton.innerHTML = `<span class="spinner-border spinner-border-sm"></span> 運算中...`;
         logCardBody.classList.remove('minimized');
         document.getElementById('log-output').textContent = '正在連接後端排班引擎...';
@@ -296,8 +421,9 @@ function initAdminPage() {
     
     function resetRunButton() {
         runButton.disabled = false;
+        saveSettingsBtn.disabled = false;
         runButton.innerHTML = '<i class="bi bi-calculator-fill"></i> 一鍵排班';
-        updateSubmissionStatus();
+        // The help text logic is simplified as the button state is now tied to saving
     }
 
     function displayResults(data) {
@@ -383,5 +509,6 @@ function initAdminPage() {
         return table;
     }
 
-    updateSubmissionStatus();
+    // Initial load for admin page
+    loadDoctorSettings();
 }

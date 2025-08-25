@@ -11,28 +11,27 @@
 <body>
     <div class="container-fluid">
         <div class="row">
-            <!-- Sidebar -->
             <nav class="col-md-3 col-lg-2 d-md-block bg-light sidebar collapse">
                 <div class="position-sticky pt-3">
                     <h4 class="sidebar-heading px-3 mt-2 mb-3">醫師儀表板</h4>
-                    <div class="px-3 mb-3">
-                        <label for="doctor-select" class="form-label">選擇醫師</label>
-                        <select id="doctor-select" class="form-select">
-                            <option selected disabled>請選擇您的姓名...</option>
-                            {% for doc in doctors %}
-                            <option value="{{ doc }}">{{ doc }}</option>
-                            {% endfor %}
-                        </select>
+                    
+                    <div id="doctor-login" class="px-3 mb-3">
+                        <label for="doctor-name-input" class="form-label">請輸入您的姓名</label>
+                        <div class="input-group">
+                            <input type="text" id="doctor-name-input" class="form-control" placeholder="例如：王大明">
+                            <button id="doctor-login-btn" class="btn btn-outline-primary">確認</button>
+                        </div>
                     </div>
+
                     <div id="doctor-info-card" class="px-3 d-none">
                         <div class="card">
                             <div class="card-body">
                                 <h5 class="card-title" id="info-card-name"></h5>
                                 <p class="card-text mb-1">
-                                    <i class="bi bi-geo-alt-fill"></i> 區域: <span id="info-card-area" class="fw-bold"></span>
+                                    <i class="bi bi-calendar-check"></i> 歡迎使用排休系統
                                 </p>
                                 <p class="card-text">
-                                    <i class="bi bi-graph-up"></i> 點數上限: <span id="info-card-points" class="fw-bold"></span>
+                                   <small class="text-muted">請在下方日曆劃記預休日期</small>
                                 </p>
                             </div>
                         </div>
@@ -42,7 +41,6 @@
                 </div>
             </nav>
 
-            <!-- Main content -->
             <main class="col-md-9 ms-sm-auto col-lg-10 px-md-4">
                 <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
                     <h1 class="h2">預休日期劃記</h1>
@@ -74,7 +72,7 @@
                     </div>
                 </div>
                 <div id="welcome-message" class="text-center p-5">
-                    <h3>請先從左側選擇您的姓名</h3>
+                    <h3>請先從左側輸入您的姓名並點擊確認</h3>
                 </div>
             </main>
         </div>
