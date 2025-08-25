@@ -30,10 +30,13 @@ main { padding-bottom: 40vh; }
 .table-wrapper > .card { width: auto; max-width: 100%; }
 .analysis-card-wrapper { display: flex; justify-content: center; }
 .analysis-card-wrapper .card { width: 100%; max-width: 600px; }
-.area-A { background-color: rgba(173, 216, 230, 0.3) !important; }
-.area-B { background-color: rgba(144, 238, 144, 0.3) !important; }
-.area-C { background-color: rgba(255, 255, 224, 0.5) !important; }
-.area-I { background-color: rgba(255, 182, 193, 0.3) !important; }
+
+/* --- 【修復】提高優先級以正確顯示顏色 --- */
+.table-hover > tbody > tr.area-A:hover, .area-A { background-color: rgba(173, 216, 230, 0.4) !important; }
+.table-hover > tbody > tr.area-B:hover, .area-B { background-color: rgba(144, 238, 144, 0.4) !important; }
+.table-hover > tbody > tr.area-C:hover, .area-C { background-color: rgba(255, 255, 224, 0.6) !important; }
+.table-hover > tbody > tr.area-I:hover, .area-I { background-color: rgba(255, 182, 193, 0.4) !important; }
+
 .schedule-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
 .schedule-table th, .schedule-table td { border: 1px solid #dee2e6; text-align: center; vertical-align: middle; padding: 0.35rem; min-width: 40px; height: 40px; }
 .schedule-table th { background-color: #e9ecef; position: sticky; top: 0; z-index: 2; }
