@@ -37,15 +37,21 @@ main { padding-bottom: 40vh; }
     --area-b-dark: #50e3c2; --area-b-light: #e8fbf7; --area-b-flash: #c6f5ea;
     --area-c-dark: #f5a623; --area-c-light: #fef6e5; --area-c-flash: #fbe6c1;
     --area-i-dark: #e350a4; --area-i-light: #fbeaf4; --area-i-flash: #f8d2e8;
-    /* 【主要修改】新增待分區顏色 */
     --area-unclassified-dark: #6c757d; --area-unclassified-light: #f8f9fa; --area-unclassified-flash: #e2e6ea;
 }
-.area-card { min-height: 150px; border-width: 2px; transition: all 0.2s ease-in-out; }
+
+/* 【主要修改】讓卡片成為 Flex 容器，為擴大拖曳區做準備 */
+.area-card {
+    min-height: 150px;
+    border-width: 2px;
+    transition: all 0.2s ease-in-out;
+    display: flex;
+    flex-direction: column;
+}
 .area-card-A { border-color: var(--area-a-dark); }
 .area-card-B { border-color: var(--area-b-dark); }
 .area-card-C { border-color: var(--area-c-dark); }
 .area-card-I { border-color: var(--area-i-dark); }
-/* 【主要修改】新增待分區卡片樣式 */
 .area-card-UNCLASSIFIED { border-color: var(--area-unclassified-dark); border-style: dashed; }
 
 .area-header { color: white; text-shadow: 1px 1px 2px rgba(0,0,0,0.2); }
@@ -53,31 +59,48 @@ main { padding-bottom: 40vh; }
 .area-header-B { background-color: var(--area-b-dark); }
 .area-header-C { background-color: var(--area-c-dark); }
 .area-header-I { background-color: var(--area-i-dark); }
-/* 【主要修改】新增待分區標題樣式 */
 .area-header-UNCLASSIFIED { background-color: var(--area-unclassified-dark); }
 
-.doctor-list .list-group-item { display: flex; align-items: center; padding: 0.75rem; border: none; border-bottom: 1px solid #eee; }
+/* 【主要修改】擴大拖曳區域的核心 */
+.doctor-list {
+    flex-grow: 1; /* 讓列表填滿卡片剩餘空間 */
+    min-height: 100px; /* 關鍵！確保空列表也有足夠的拖曳高度 */
+    padding: 0.5rem; /* 增加內部邊距，讓放置區域更大 */
+    border-bottom-left-radius: calc(0.375rem - 2px);
+    border-bottom-right-radius: calc(0.375rem - 2px);
+    transition: background-color 0.2s ease;
+}
+
+/* 【主要修改】當有東西被拖到這個列表上方時，改變背景色提供視覺回饋 */
+.doctor-list.sortable-drag {
+    background-color: #d6eaff !important;
+}
+
+/* 【主要修改】優化醫師卡片外觀 */
+.doctor-list .list-group-item {
+    display: flex;
+    align-items: center;
+    padding: 0.5rem 0.75rem;
+    border: 1px solid #e0e0e0;
+    border-radius: .25rem;
+    margin-bottom: 0.5rem;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+}
+.doctor-list .list-group-item:last-child {
+    margin-bottom: 0;
+}
+
 .area-card-A .list-group-item { background-color: var(--area-a-light); }
 .area-card-B .list-group-item { background-color: var(--area-b-light); }
 .area-card-C .list-group-item { background-color: var(--area-c-light); }
 .area-card-I .list-group-item { background-color: var(--area-i-light); }
-/* 【主要修改】新增待分區列表項目樣式 */
 .area-card-UNCLASSIFIED .list-group-item { background-color: var(--area-unclassified-light); }
 
 .doctor-list-item-content { flex-grow: 1; display: flex; align-items: center; gap: 0.5rem; min-width: 0; }
 .drag-handle { cursor: grab; font-size: 1.3rem; color: #999; padding-right: 0.5rem;}
 .doctor-list .list-group-item:active { cursor: grabbing; }
 
-.doctor-name {
-    font-weight: 500;
-    flex-grow: 1;
-    flex-shrink: 1;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    min-width: 0;
-    font-size: 1rem;
-}
+.doctor-name { font-weight: 500; flex-grow: 1; flex-shrink: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; font-size: 1rem; }
 .doctor-name.name-len-2 { font-size: 0.9rem; }
 .doctor-name.name-len-3 { font-size: 0.8rem; }
 .doctor-name.name-len-4 { font-size: 0.7rem; }
@@ -86,17 +109,20 @@ main { padding-bottom: 40vh; }
 .points-input-wrapper { display: flex; align-items: center; gap: 0.25rem; flex-shrink: 0; }
 .points-input-wrapper .form-label { font-size: 0.8em; margin-bottom: 0; }
 .points-input-wrapper .form-control { width: 50px; text-align: center; }
-.sortable-ghost { background: #d6eaff; opacity: 0.7; border-radius: .25rem;}
+
+/* 【主要修改】優化拖曳時的佔位符樣式 */
+.sortable-ghost {
+    background: #c8ebfb;
+    opacity: 0.8;
+    border: 2px dashed #0d6efd;
+}
 .remove-btn { flex-shrink: 0; }
 
-/* 閃爍動畫 */
 @keyframes flash-A { 50% { background-color: var(--area-a-flash); } }
 @keyframes flash-B { 50% { background-color: var(--area-b-flash); } }
 @keyframes flash-C { 50% { background-color: var(--area-c-flash); } }
 @keyframes flash-I { 50% { background-color: var(--area-i-flash); } }
-/* 【主要修改】新增待分區閃爍動畫 */
 @keyframes flash-UNCLASSIFIED { 50% { background-color: var(--area-unclassified-flash); } }
-
 .flash-A { animation: flash-A 1.5s; }
 .flash-B { animation: flash-B 1.5s; }
 .flash-C { animation: flash-C 1.5s; }

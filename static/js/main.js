@@ -10,7 +10,7 @@ document.addEventListener('DOMContentLoaded', function () {
 // --- Doctor Page Logic ---
 function initDoctorPage() { const nameInput = document.getElementById('doctor-name-input'); const loginBtn = document.getElementById('doctor-login-btn'); const yearSelect = document.getElementById('year-select'); const monthSelect = document.getElementById('month-select'); const calendarDiv = document.getElementById('calendar'); const calendarTitle = document.getElementById('calendar-title'); const submitBtn = document.getElementById('submit-schedule-btn'); const modifyBtn = document.getElementById('modify-schedule-btn'); const submittedInfo = document.getElementById('submitted-info'); const doctorInfoCard = document.getElementById('doctor-info-card'); const mainContent = document.getElementById('main-content'); const welcomeMessage = document.getElementById('welcome-message'); const pointsDisplay = document.getElementById('days-off-points'); const pointsWarning = document.getElementById('points-warning'); let currentDoctor = null; let currentYear = new Date().getFullYear(); let currentMonth = new Date().getMonth() + 1; let holidays = []; let isDragging = false, dragStartDay = null, dragToggleState = false; let isCalendarReadOnly = false; for (let y = currentYear; y <= currentYear + 2; y++) yearSelect.add(new Option(y, y)); for (let m = 1; m <= 12; m++) monthSelect.add(new Option(m, m)); yearSelect.value = currentYear; monthSelect.value = currentMonth; const startSession = () => { const name = nameInput.value.trim(); if (name) { currentDoctor = name; welcomeMessage.classList.add('d-none'); mainContent.classList.remove('d-none'); doctorInfoCard.classList.remove('d-none'); document.getElementById('info-card-name').textContent = currentDoctor; nameInput.disabled = true; loginBtn.disabled = true; loadAndRenderCalendar(); } else { alert('請輸入您的姓名'); } }; loginBtn.addEventListener('click', startSession); nameInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') startSession(); });[yearSelect, monthSelect].forEach(el => el.addEventListener('change', () => { currentYear = parseInt(yearSelect.value); currentMonth = parseInt(monthSelect.value); loadAndRenderCalendar(); })); modifyBtn.addEventListener('click', () => setCalendarMode(false)); submitBtn.addEventListener('click', submitDaysOff); calendarDiv.addEventListener('mousedown', e => { if (isCalendarReadOnly || !e.target.classList.contains('available')) return; e.preventDefault(); isDragging = true; dragStartDay = parseInt(e.target.dataset.day); dragToggleState = !e.target.classList.contains('selected'); e.target.classList.toggle('selected', dragToggleState); }); calendarDiv.addEventListener('mouseover', e => { if (!isDragging || isCalendarReadOnly || !e.target.classList.contains('available')) return; const currentDay = parseInt(e.target.dataset.day); const start = Math.min(dragStartDay, currentDay); const end = Math.max(dragStartDay, currentDay); calendarDiv.querySelectorAll('.available').forEach(cell => { const day = parseInt(cell.dataset.day); if (day >= start && day <= end) { cell.classList.toggle('selected', dragToggleState); } }); }); document.addEventListener('mouseup', () => { if (!isDragging) return; isDragging = false; dragStartDay = null; updatePointsCount(); }); calendarDiv.addEventListener('click', e => { if (isCalendarReadOnly || isDragging || !e.target.classList.contains('available')) return; e.target.classList.toggle('selected'); updatePointsCount(); }); async function loadAndRenderCalendar() { if (!currentDoctor) return; const response = await fetch(`/api/schedule_data/${currentYear}/${currentMonth}`); const data = await response.json(); const doctorSchedule = data.submissions[currentDoctor] || { days_off: [], submitted: false }; holidays = data.holidays || []; renderCalendar(doctorSchedule.days_off); setCalendarMode(doctorSchedule.submitted); } function renderCalendar(selectedDays) { calendarDiv.innerHTML = ''; calendarTitle.textContent = `${currentYear} 年 ${currentMonth} 月`; const daysInMonth = new Date(currentYear, currentMonth, 0).getDate(); const firstDayOfMonth = new Date(currentYear, currentMonth - 1, 1).getDay(); const dayHeaders = ['日', '一', '二', '三', '四', '五', '六']; dayHeaders.forEach(h => { const el = document.createElement('div'); el.className = 'calendar-day header'; el.textContent = h; calendarDiv.appendChild(el); }); for (let i = 0; i < firstDayOfMonth; i++) { const el = document.createElement('div'); el.className = 'calendar-day other-month'; calendarDiv.appendChild(el); } for (let day = 1; day <= daysInMonth; day++) { const dayEl = document.createElement('div'); dayEl.className = 'calendar-day available'; dayEl.textContent = day; dayEl.dataset.day = day; if (holidays.includes(day)) dayEl.classList.add('holiday'); const dayOfWeek = new Date(currentYear, currentMonth - 1, day).getDay(); if (dayOfWeek === 0 || dayOfWeek === 6) dayEl.classList.add('weekend'); if (selectedDays.includes(day)) dayEl.classList.add('selected'); calendarDiv.appendChild(dayEl); } updatePointsCount(); } function setCalendarMode(isReadOnly) { isCalendarReadOnly = isReadOnly; calendarDiv.classList.toggle('is-readonly', isReadOnly); submittedInfo.classList.toggle('d-none', !isReadOnly); submitBtn.classList.toggle('d-none', isReadOnly); modifyBtn.classList.toggle('d-none', !isReadOnly); } function updatePointsCount() { let totalPoints = 0; calendarDiv.querySelectorAll('.calendar-day.selected').forEach(dayEl => { if (dayEl.classList.contains('weekend') || dayEl.classList.contains('holiday')) { totalPoints += 2; } else { totalPoints += 1; } }); pointsDisplay.textContent = totalPoints; pointsWarning.classList.toggle('d-none', totalPoints <= 4); } async function submitDaysOff() { const daysOff = Array.from(calendarDiv.querySelectorAll('.selected')).map(el => parseInt(el.dataset.day)); submitBtn.disabled = true; submitBtn.innerHTML = `<span class="spinner-border spinner-border-sm"></span> 儲存中...`; try { const response = await fetch('/api/submit_days_off', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ doctor: currentDoctor, year: currentYear, month: currentMonth, daysOff }) }); const result = await response.json(); if(result.status === 'success') { alert('預休日期已成功儲存！'); setCalendarMode(true); } else { alert(`儲存失敗：${result.message}`); } } catch (error) { console.error("Submit error:", error); alert('提交時發生錯誤。'); } finally { submitBtn.disabled = false; submitBtn.innerHTML = `<i class="bi bi-check-circle-fill"></i> 提交本月預休`; } } }
 
-// --- Admin Page Logic (v2.13.0 - Clear Data Fix) ---
+// --- Admin Page Logic (v2.14.0 - Real-time Save Fix) ---
 function initAdminPage() {
     const yearSelect = document.getElementById('admin-year-select');
     const monthSelect = document.getElementById('admin-month-select');
@@ -55,23 +55,41 @@ function initAdminPage() {
     loadTemplateBtn.addEventListener('click', () => { if (confirm("這將會用預設的醫師資料覆蓋目前的醫師設定，確定要載入嗎？")) { loadTemplateData(); } });
     clearMonthBtn.addEventListener('click', async () => { if (confirm(`這將會永久刪除 ${currentYear} 年 ${currentMonth} 月的所有資料，確定要清空嗎？`)) { try { const response = await fetch('/api/clear_month_data', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ year: currentYear, month: currentMonth }) }); const result = await response.json(); alert(result.message); if (result.status === 'success') { loadDoctorSettings(); } } catch (error) { alert('清除資料時發生錯誤。'); } } });
     
-    saveNewDoctorBtn.addEventListener('click', () => {
+    // 【主要修改】修改新增醫師的邏輯，使其直接與後端溝通
+    saveNewDoctorBtn.addEventListener('click', async () => {
         const name = newDoctorNameInput.value.trim();
         const area = newDoctorAreaSelect.value;
         if (!name) { alert('醫師姓名不可為空！'); return; }
 
-        // 【主要修改】在新增醫師前，先移除「尚無資料」的提示
-        const placeholder = document.getElementById('no-data-placeholder');
-        if (placeholder) {
-            placeholder.remove();
-        }
+        saveNewDoctorBtn.disabled = true;
+        saveNewDoctorBtn.innerHTML = `<span class="spinner-border spinner-border-sm"></span> 新增中...`;
 
-        const template = doctorTemplate[name] || {};
-        const newRowData = { name: name, data: { days_off: [], area: area, points_limit: template.points_limit || 8, submitted: false } };
-        renderDoctorItem(newRowData);
-        sortAreaList(areaLists[area]);
-        addDoctorModal.hide();
-        newDoctorNameInput.value = '';
+        try {
+            const response = await fetch('/api/add_doctor', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ year: currentYear, month: currentMonth, name: name, area: area })
+            });
+            const result = await response.json();
+
+            if (result.status === 'success') {
+                const placeholder = document.getElementById('no-data-placeholder');
+                if (placeholder) placeholder.remove();
+                
+                renderDoctorItem({ name: name, data: result.new_doctor_data });
+                sortAreaList(areaLists[area]);
+                addDoctorModal.hide();
+                newDoctorNameInput.value = '';
+            } else {
+                alert(`新增失敗：${result.message}`);
+            }
+        } catch (error) {
+            console.error("Add doctor error:", error);
+            alert('新增醫師時發生網路錯誤。');
+        } finally {
+            saveNewDoctorBtn.disabled = false;
+            saveNewDoctorBtn.innerHTML = `確認新增`;
+        }
     });
 
     saveSettingsBtn.addEventListener('click', saveDoctorSettings);
@@ -91,26 +109,19 @@ function initAdminPage() {
                 const itemEl = evt.item;
                 const toList = evt.to;
                 const newArea = toList.dataset.area;
-                
                 const pointsWrapper = itemEl.querySelector('.points-input-wrapper');
                 if (pointsWrapper) {
                     pointsWrapper.classList.toggle('d-none', newArea === 'UNCLASSIFIED');
                 }
-                
                 setTimeout(() => {
                     sortAreaList(evt.from);
-                    if (evt.from !== toList) {
-                        sortAreaList(toList);
-                    }
-                    
+                    if (evt.from !== toList) sortAreaList(toList);
                     const movedItem = toList.querySelector(`[data-doctor-name="${itemEl.dataset.doctorName}"]`);
                     if (movedItem) {
                         movedItem.classList.remove('flash-A', 'flash-B', 'flash-C', 'flash-I', 'flash-UNCLASSIFIED');
                         requestAnimationFrame(() => {
                             movedItem.classList.add(`flash-${newArea}`);
-                            movedItem.addEventListener('animationend', () => {
-                                movedItem.classList.remove(`flash-${newArea}`);
-                            }, { once: true });
+                            movedItem.addEventListener('animationend', () => movedItem.classList.remove(`flash-${newArea}`), { once: true });
                         });
                     }
                 }, 0);
@@ -124,23 +135,21 @@ function initAdminPage() {
             const response = await fetch(`/api/schedule_data/${currentYear}/${currentMonth}`);
             const data = await response.json();
             doctorTemplate = data.doctor_template || {};
-            // 【主要修改】確保每次載入都從清空的狀態開始
             Object.values(areaLists).forEach(list => list.innerHTML = ''); 
-
             const submissions = data.submissions || {};
             const doctorsToRender = Object.entries(submissions).filter(([name, _]) => name !== 'final_schedule');
-            
             if (doctorsToRender.length > 0) {
                 doctorsToRender.forEach(([name, docData]) => renderDoctorItem({ name, data: docData }));
                 Object.values(areaLists).forEach(sortAreaList);
             } else {
-                 // 【主要修改】為提示項加上固定ID，方便之後移除
                  areaLists.A.innerHTML = `<li id="no-data-placeholder" class="list-group-item text-muted" style="background-color: var(--area-a-light);">本月尚無資料</li>`;
             }
         } catch (error) { console.error("Failed to load doctor settings:", error); alert("讀取醫師設定失敗。"); }
     }
 
     function loadTemplateData() { 
+        const placeholder = document.getElementById('no-data-placeholder');
+        if (placeholder) placeholder.remove();
         Object.values(areaLists).forEach(list => list.innerHTML = '');
         Object.entries(doctorTemplate).forEach(([name, template]) => { renderDoctorItem({ name: name, data: { ...template, submitted: true } }); }); 
         Object.values(areaLists).forEach(sortAreaList);
@@ -153,7 +162,7 @@ function initAdminPage() {
         items.sort((a, b) => {
             const pointsA_el = a.querySelector('.points-input');
             const pointsB_el = b.querySelector('.points-input');
-            if (!pointsA_el || !pointsB_el) return 0; // 如果是 placeholder li，就不排序
+            if (!pointsA_el || !pointsB_el) return 0;
             const pointsA = parseInt(pointsA_el.value, 10) || 0;
             const pointsB = parseInt(pointsB_el.value, 10) || 0;
             return pointsB - pointsA;
@@ -164,18 +173,13 @@ function initAdminPage() {
     function renderDoctorItem({ name, data }) {
         const area = data.area || 'UNCLASSIFIED';
         const targetList = areaLists[area];
-        if (!targetList) {
-            console.warn(`Area list for "${area}" not found.`);
-            return;
-        }
+        if (!targetList) { console.warn(`Area list for "${area}" not found.`); return; }
         const item = document.createElement('div');
         item.className = 'list-group-item';
         item.dataset.doctorName = name;
         item.dataset.daysOff = JSON.stringify(data.days_off || []);
         item.dataset.submitted = data.submitted || false;
-
         const isUnclassified = (area === 'UNCLASSIFIED');
-        
         item.innerHTML = `
             <i class="bi bi-grip-vertical drag-handle"></i>
             <div class="doctor-list-item-content">
@@ -188,26 +192,18 @@ function initAdminPage() {
             </div>
         `;
         targetList.appendChild(item);
-        
         const nameEl = item.querySelector('.doctor-name');
-        if (name.length >= 5) nameEl.classList.add('name-len-5');
-        else if (name.length === 4) nameEl.classList.add('name-len-4');
-        else if (name.length === 3) nameEl.classList.add('name-len-3');
-        else if (name.length === 2) nameEl.classList.add('name-len-2');
-
-        item.querySelector('.remove-btn').addEventListener('click', () => { if (confirm(`確定要從本月排班中移除 ${name} 嗎？`)) { item.remove(); } });
-        const pointsInput = item.querySelector('.points-input');
-        pointsInput.addEventListener('change', () => sortAreaList(targetList));
+        if (name.length >= 5) nameEl.classList.add('name-len-5'); else if (name.length === 4) nameEl.classList.add('name-len-4'); else if (name.length === 3) nameEl.classList.add('name-len-3'); else if (name.length === 2) nameEl.classList.add('name-len-2');
+        item.querySelector('.remove-btn').addEventListener('click', () => { if (confirm(`確定要從本月排班中移除 ${name} 嗎？`)) { item.remove(); alert('已從畫面移除，請記得點擊「儲存醫師設定」以讓變更生效！'); } });
+        item.querySelector('.points-input').addEventListener('change', () => sortAreaList(targetList));
     }
 
     async function saveDoctorSettings() {
         const settingsPayload = {};
-        let hasError = false;
         Object.entries(areaLists).forEach(([area, listEl]) => {
-            const items = listEl.querySelectorAll('.list-group-item');
-            items.forEach(item => {
+            listEl.querySelectorAll('.list-group-item').forEach(item => {
                 const name = item.dataset.doctorName;
-                if (!name) { return; } // 跳過 placeholder
+                if (!name) return;
                 settingsPayload[name] = {
                     days_off: JSON.parse(item.dataset.daysOff),
                     area: area,
@@ -216,7 +212,6 @@ function initAdminPage() {
                 };
             });
         });
-
         saveSettingsBtn.disabled = true; saveSettingsBtn.innerHTML = `<span class="spinner-border spinner-border-sm"></span> 儲存中...`; 
         try { 
             const response = await fetch('/api/update_doctor_settings', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ year: currentYear, month: currentMonth, settings: settingsPayload }) }); 
