@@ -173,6 +173,8 @@ function initAdminPage() {
             nameEl.classList.add('name-len-4');
         } else if (name.length === 3) {
             nameEl.classList.add('name-len-3');
+        }else if (name.length === 2) {
+            nameEl.classList.add('name-len-2');
         }
 
         item.querySelector('.remove-btn').addEventListener('click', () => { if (confirm(`確定要從本月排班中移除 ${name} 嗎？`)) { item.remove(); } });

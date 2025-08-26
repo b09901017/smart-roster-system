@@ -69,8 +69,9 @@ main { padding-bottom: 40vh; }
     font-size: 1rem; /* 預設大小 */
 }
 /* 根據字數調整字體大小 */
-.doctor-name.name-len-3 { font-size: 0.32rem; }
-.doctor-name.name-len-4 { font-size: 0.25rem; }
+.doctor-name.name-len-2 { font-size: 0.8rem; }
+.doctor-name.name-len-3 { font-size: 0.6rem; }
+.doctor-name.name-len-4 { font-size: 0.4rem; }
 .doctor-name.name-len-5 { font-size: 0.2rem; }
 
 .points-input-wrapper { display: flex; align-items: center; gap: 0.25rem; flex-shrink: 0; }
