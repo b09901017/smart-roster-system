@@ -1,5 +1,5 @@
 # --------------------------------------------------------------------------
-# 智慧排班系統 - Flask 網頁應用程式 (v2.5.0 - SSE Heartbeat Fix)
+# 智慧排班系統 - Flask 網頁應用程式 (v2.6.1 - Production Ready)
 # --------------------------------------------------------------------------
 
 import gevent.monkey
@@ -9,10 +9,10 @@ import os
 import io
 import json
 import threading
-import time # 引入 time 模組
+import time
 from datetime import datetime, timedelta
 from collections import defaultdict
-from queue import Queue, Empty # 引入 Empty 異常
+from queue import Queue, Empty
 import pandas as pd
 import holidays
 from flask import Flask, render_template, request, jsonify, Response, send_from_directory
@@ -28,8 +28,6 @@ OUTPUT_DIR = os.path.join(DATA_DIR, 'output')
 if not os.path.exists(OUTPUT_DIR): os.makedirs(OUTPUT_DIR)
 DOCTOR_SCHEDULE_SUBMISSIONS = defaultdict(lambda: defaultdict(dict))
 DOCTOR_TEMPLATE = {}
-
-# --- (除了 run_scheduler_endpoint 以外的所有函式都與之前版本相同) ---
 
 def get_month_key(year, month): return f"{year}-{str(month).zfill(2)}"
 def save_data(data, file_path):
@@ -111,15 +109,39 @@ def clear_month_data():
     data = request.json; year, month = data.get('year'), data.get('month'); month_key = get_month_key(year, month)
     if month_key in DOCTOR_SCHEDULE_SUBMISSIONS: del DOCTOR_SCHEDULE_SUBMISSIONS[month_key]; save_data(DOCTOR_SCHEDULE_SUBMISSIONS, DATA_FILE); return jsonify({'status': 'success', 'message': f'{month_key} 的資料已成功清除。'})
     else: return jsonify({'status': 'success', 'message': f'{month_key} 本來就沒有資料。'})
+
 @app.route('/api/submit_days_off', methods=['POST'])
 def submit_days_off():
-    data = request.json; year, month, doc_name = data.get('year'), data.get('month'), data.get('doctor'); days_off = data.get('daysOff', []); month_key = get_month_key(year, month)
-    if doc_name:
-        if doc_name not in DOCTOR_SCHEDULE_SUBMISSIONS[month_key] and doc_name in DOCTOR_TEMPLATE:
-            template = DOCTOR_TEMPLATE[doc_name]; DOCTOR_SCHEDULE_SUBMISSIONS[month_key][doc_name] = {"area": template.get("area", "A"), "points_limit": template.get("points_limit", 8)}
-        DOCTOR_SCHEDULE_SUBMISSIONS[month_key][doc_name].update({'days_off': days_off, 'submitted': True, 'is_template': False}); save_data(DOCTOR_SCHEDULE_SUBMISSIONS, DATA_FILE)
-        return jsonify({'status': 'success', 'message': f'{doc_name} 於 {month_key} 的預休已提交。'})
-    return jsonify({'status': 'error', 'message': '醫師姓名不可為空'}), 400
+    data = request.json
+    year, month, doc_name = data.get('year'), data.get('month'), data.get('doctor')
+    days_off = data.get('daysOff', [])
+    month_key = get_month_key(year, month)
+
+    if not doc_name:
+        return jsonify({'status': 'error', 'message': '醫師姓名不可為空'}), 400
+
+    # 【主要修改】如果醫師是第一次提交，為他建立一個預設的紀錄
+    if doc_name not in DOCTOR_SCHEDULE_SUBMISSIONS[month_key]:
+        # 從範本查找是否有預設點數，否則給一個通用預設值
+        template = DOCTOR_TEMPLATE.get(doc_name, {})
+        DOCTOR_SCHEDULE_SUBMISSIONS[month_key][doc_name] = {
+            "area": "UNCLASSIFIED",  # 預設為「待分區」
+            "points_limit": template.get("points_limit", 8),
+            "days_off": [],
+            "submitted": False,
+            "is_template": False
+        }
+
+    # 更新醫師的預休資料
+    DOCTOR_SCHEDULE_SUBMISSIONS[month_key][doc_name].update({
+        'days_off': days_off,
+        'submitted': True,
+        'is_template': False
+    })
+    save_data(DOCTOR_SCHEDULE_SUBMISSIONS, DATA_FILE)
+    
+    return jsonify({'status': 'success', 'message': f'{doc_name} 於 {month_key} 的預休已提交。'})
+
 @app.route('/api/update_doctor_settings', methods=['POST'])
 def update_doctor_settings():
     data = request.json; year, month, settings = data.get('year'), data.get('month'), data.get('settings', {}); month_key = get_month_key(year, month)
@@ -140,7 +162,9 @@ def run_scheduler_endpoint():
         prev_month_schedule = DOCTOR_SCHEDULE_SUBMISSIONS.get(prev_month_key, {}).get("final_schedule", {})
         doctor_data_for_scheduler = []
         for name, info in current_month_settings.items():
-            if name == "final_schedule": continue
+            # 【主要修改】跳過特殊鍵值以及尚未被分區的醫師
+            if name == "final_schedule" or info.get('area') == 'UNCLASSIFIED':
+                continue
             last_month_duty_day = 0
             if prev_month_schedule and name in prev_month_schedule:
                 last_day_of_prev_month = prev_month_date.day
@@ -149,18 +173,16 @@ def run_scheduler_endpoint():
                 elif str(last_day_of_prev_month - 1) in doc_prev_schedule: last_month_duty_day = last_day_of_prev_month - 1
             doctor_data_for_scheduler.append({'醫師姓名': name, '區域': info.get('area', 'A'), '點數上限': info.get('points_limit', 8), '不可排班日': info.get('days_off', []), '上月班別日': last_month_duty_day})
         
-        q = Queue()
+        if not doctor_data_for_scheduler:
+             return Response(f"event: DONE\ndata: {json.dumps({'status': 'error', 'message': '沒有已完成分區設定的醫師，無法排班。'})}\n\n", mimetype='text/event-stream')
 
-        # 【主要修改處】
+        q = Queue()
         def event_stream():
             yield "data: 連線已建立...\n\n"
             last_heartbeat = time.time()
-            
             while True:
                 try:
-                    # 使用帶有超時的 get，避免永久阻塞
                     log_entry = q.get(timeout=1.0) 
-                    
                     if log_entry == "DONE_SUCCESS":
                         final_result = q.get()
                         if 'schedule' in final_result:
@@ -175,21 +197,22 @@ def run_scheduler_endpoint():
                         break
                     elif isinstance(log_entry, str):
                         yield f"data: {log_entry}\n\n"
-                
                 except Empty:
-                    # 如果佇列為空（表示排班引擎正在運算中但暫無新日誌），
-                    # 我們檢查是否需要發送心跳
                     if time.time() - last_heartbeat > 15:
-                        yield ": heartbeat\n\n" # SSE 註解語法，客戶端會忽略，但能保持連線
+                        yield ": heartbeat\n\n"
                         last_heartbeat = time.time()
         
         threading.Thread(target=solve_schedule_web, args=(doctor_data_for_scheduler, year, month, q, OUTPUT_DIR)).start()
         
         response = Response(event_stream(), mimetype='text/event-stream')
-        response.headers['X-Accel-Buffering'] = 'no' # 針對 Nginx
-        response.headers['Cache-Control'] = 'no-cache' # 通用標頭
+        response.headers['X-Accel-Buffering'] = 'no'
+        response.headers['Cache-Control'] = 'no-cache'
         return response
 
     except Exception as e:
         error_payload = json.dumps({'status': 'error', 'message': f'API 內部嚴重錯誤: {e}'})
         return Response(f"event: DONE\ndata: {error_payload}\n\n", mimetype='text/event-stream')
+
+# 【主要修改】移除用於本機開發的啟動區塊
+# if __name__ == '__main__':
+#     app.run(debug=True)

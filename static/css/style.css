@@ -37,38 +37,47 @@ main { padding-bottom: 40vh; }
     --area-b-dark: #50e3c2; --area-b-light: #e8fbf7; --area-b-flash: #c6f5ea;
     --area-c-dark: #f5a623; --area-c-light: #fef6e5; --area-c-flash: #fbe6c1;
     --area-i-dark: #e350a4; --area-i-light: #fbeaf4; --area-i-flash: #f8d2e8;
+    /* 【主要修改】新增待分區顏色 */
+    --area-unclassified-dark: #6c757d; --area-unclassified-light: #f8f9fa; --area-unclassified-flash: #e2e6ea;
 }
 .area-card { min-height: 150px; border-width: 2px; transition: all 0.2s ease-in-out; }
 .area-card-A { border-color: var(--area-a-dark); }
 .area-card-B { border-color: var(--area-b-dark); }
 .area-card-C { border-color: var(--area-c-dark); }
 .area-card-I { border-color: var(--area-i-dark); }
+/* 【主要修改】新增待分區卡片樣式 */
+.area-card-UNCLASSIFIED { border-color: var(--area-unclassified-dark); border-style: dashed; }
+
 .area-header { color: white; text-shadow: 1px 1px 2px rgba(0,0,0,0.2); }
 .area-header-A { background-color: var(--area-a-dark); }
 .area-header-B { background-color: var(--area-b-dark); }
 .area-header-C { background-color: var(--area-c-dark); }
 .area-header-I { background-color: var(--area-i-dark); }
+/* 【主要修改】新增待分區標題樣式 */
+.area-header-UNCLASSIFIED { background-color: var(--area-unclassified-dark); }
+
 .doctor-list .list-group-item { display: flex; align-items: center; padding: 0.75rem; border: none; border-bottom: 1px solid #eee; }
 .area-card-A .list-group-item { background-color: var(--area-a-light); }
 .area-card-B .list-group-item { background-color: var(--area-b-light); }
 .area-card-C .list-group-item { background-color: var(--area-c-light); }
 .area-card-I .list-group-item { background-color: var(--area-i-light); }
+/* 【主要修改】新增待分區列表項目樣式 */
+.area-card-UNCLASSIFIED .list-group-item { background-color: var(--area-unclassified-light); }
+
 .doctor-list-item-content { flex-grow: 1; display: flex; align-items: center; gap: 0.5rem; min-width: 0; }
 .drag-handle { cursor: grab; font-size: 1.3rem; color: #999; padding-right: 0.5rem;}
 .doctor-list .list-group-item:active { cursor: grabbing; }
 
-/* 【主要修改處】 */
 .doctor-name {
     font-weight: 500;
     flex-grow: 1;
     flex-shrink: 1;
-    white-space: nowrap; /* 保持單行 */
+    white-space: nowrap;
     overflow: hidden;
-    text-overflow: ellipsis; /* 超出部分用 ... 代替 */
+    text-overflow: ellipsis;
     min-width: 0;
-    font-size: 1rem; /* 預設大小 */
+    font-size: 1rem;
 }
-/* 根據字數調整字體大小 */
 .doctor-name.name-len-2 { font-size: 0.9rem; }
 .doctor-name.name-len-3 { font-size: 0.8rem; }
 .doctor-name.name-len-4 { font-size: 0.7rem; }
@@ -85,13 +94,15 @@ main { padding-bottom: 40vh; }
 @keyframes flash-B { 50% { background-color: var(--area-b-flash); } }
 @keyframes flash-C { 50% { background-color: var(--area-c-flash); } }
 @keyframes flash-I { 50% { background-color: var(--area-i-flash); } }
+/* 【主要修改】新增待分區閃爍動畫 */
+@keyframes flash-UNCLASSIFIED { 50% { background-color: var(--area-unclassified-flash); } }
 
 .flash-A { animation: flash-A 1.5s; }
 .flash-B { animation: flash-B 1.5s; }
 .flash-C { animation: flash-C 1.5s; }
 .flash-I { animation: flash-I 1.5s; }
+.flash-UNCLASSIFIED { animation: flash-UNCLASSIFIED 1.5s; }
 
-/* --- (其餘樣式與之前相同) --- */
 .schedule-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
 .schedule-table th, .schedule-table td { border: 1px solid #dee2e6; text-align: center; vertical-align: middle; padding: 0.35rem; min-width: 40px; height: 40px; }
 .schedule-table th { background-color: #e9ecef; position: sticky; top: 0; z-index: 2; }
