@@ -57,26 +57,28 @@ main { padding-bottom: 40vh; }
 .area-card-B .list-group-item { background-color: var(--area-b-light); }
 .area-card-C .list-group-item { background-color: var(--area-c-light); }
 .area-card-I .list-group-item { background-color: var(--area-i-light); }
-.doctor-list-item-content { flex-grow: 1; display: flex; align-items: center; gap: 0.5rem; min-width: 0; /* 關鍵：允許 flex item 縮小 */}
+.doctor-list-item-content { flex-grow: 1; display: flex; align-items: center; gap: 0.5rem; min-width: 0; }
 .drag-handle { cursor: grab; font-size: 1.3rem; color: #999; padding-right: 0.5rem;}
 .doctor-list .list-group-item:active { cursor: grabbing; }
-/* 【主要修改處】讓姓名欄位自動伸縮，並處理長姓名 */
-.doctor-name { 
-    font-weight: 500; 
-    font-size: 1.05rem; 
-    flex-grow: 1;  /* 佔據所有可用空間 */
-    flex-shrink: 1; /* 允許縮小 */
-    white-space: nowrap; /* 避免換行 */
-    overflow: hidden; /* 隱藏超出的部分 */
-    text-overflow: ellipsis; /* 超出部分顯示... */
-    min-width: 0; /* 關鍵：允許 flex item 縮小 */
+
+/* 【主要修改處】 */
+.doctor-name {
+    font-weight: 500;
+    font-size: 1rem; /* 預設字體大小 */
+    flex-grow: 1;
+    flex-shrink: 1;
+    white-space: normal; /* 允許多行 */
+    overflow: visible;
+    text-overflow: clip;
+    min-width: 0;
+    line-height: 1.2; /* 調整行高以適應換行 */
+    word-break: break-all; /* 強制長單字換行 */
 }
-/* 【主要修改處】縮小點數區塊 */
-.points-input-wrapper { display: flex; align-items: center; gap: 0.25rem; flex-shrink: 0; /* 不允許縮小 */ }
+.points-input-wrapper { display: flex; align-items: center; gap: 0.25rem; flex-shrink: 0; }
 .points-input-wrapper .form-label { font-size: 0.8em; margin-bottom: 0; }
-.points-input-wrapper .form-control { width: 60px; text-align: center; }
+.points-input-wrapper .form-control { width: 50px; text-align: center; }
 .sortable-ghost { background: #d6eaff; opacity: 0.7; border-radius: .25rem;}
-.remove-btn { flex-shrink: 0; /* 不允許縮小 */ }
+.remove-btn { flex-shrink: 0; }
 
 /* --- (其餘樣式與之前相同) --- */
 .schedule-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }

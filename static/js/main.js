@@ -10,13 +10,12 @@ document.addEventListener('DOMContentLoaded', function () {
 // --- Doctor Page Logic (unchanged) ---
 function initDoctorPage() { const nameInput = document.getElementById('doctor-name-input'); const loginBtn = document.getElementById('doctor-login-btn'); const yearSelect = document.getElementById('year-select'); const monthSelect = document.getElementById('month-select'); const calendarDiv = document.getElementById('calendar'); const calendarTitle = document.getElementById('calendar-title'); const submitBtn = document.getElementById('submit-schedule-btn'); const modifyBtn = document.getElementById('modify-schedule-btn'); const submittedInfo = document.getElementById('submitted-info'); const doctorInfoCard = document.getElementById('doctor-info-card'); const mainContent = document.getElementById('main-content'); const welcomeMessage = document.getElementById('welcome-message'); const pointsDisplay = document.getElementById('days-off-points'); const pointsWarning = document.getElementById('points-warning'); let currentDoctor = null; let currentYear = new Date().getFullYear(); let currentMonth = new Date().getMonth() + 1; let holidays = []; let isDragging = false, dragStartDay = null, dragToggleState = false; let isCalendarReadOnly = false; for (let y = currentYear; y <= currentYear + 2; y++) yearSelect.add(new Option(y, y)); for (let m = 1; m <= 12; m++) monthSelect.add(new Option(m, m)); yearSelect.value = currentYear; monthSelect.value = currentMonth; const startSession = () => { const name = nameInput.value.trim(); if (name) { currentDoctor = name; welcomeMessage.classList.add('d-none'); mainContent.classList.remove('d-none'); doctorInfoCard.classList.remove('d-none'); document.getElementById('info-card-name').textContent = currentDoctor; nameInput.disabled = true; loginBtn.disabled = true; loadAndRenderCalendar(); } else { alert('請輸入您的姓名'); } }; loginBtn.addEventListener('click', startSession); nameInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') startSession(); });[yearSelect, monthSelect].forEach(el => el.addEventListener('change', () => { currentYear = parseInt(yearSelect.value); currentMonth = parseInt(monthSelect.value); loadAndRenderCalendar(); })); modifyBtn.addEventListener('click', () => setCalendarMode(false)); submitBtn.addEventListener('click', submitDaysOff); calendarDiv.addEventListener('mousedown', e => { if (isCalendarReadOnly || !e.target.classList.contains('available')) return; e.preventDefault(); isDragging = true; dragStartDay = parseInt(e.target.dataset.day); dragToggleState = !e.target.classList.contains('selected'); e.target.classList.toggle('selected', dragToggleState); }); calendarDiv.addEventListener('mouseover', e => { if (!isDragging || isCalendarReadOnly || !e.target.classList.contains('available')) return; const currentDay = parseInt(e.target.dataset.day); const start = Math.min(dragStartDay, currentDay); const end = Math.max(dragStartDay, currentDay); calendarDiv.querySelectorAll('.available').forEach(cell => { const day = parseInt(cell.dataset.day); if (day >= start && day <= end) { cell.classList.toggle('selected', dragToggleState); } }); }); document.addEventListener('mouseup', () => { if (!isDragging) return; isDragging = false; dragStartDay = null; updatePointsCount(); }); calendarDiv.addEventListener('click', e => { if (isCalendarReadOnly || isDragging || !e.target.classList.contains('available')) return; e.target.classList.toggle('selected'); updatePointsCount(); }); async function loadAndRenderCalendar() { if (!currentDoctor) return; const response = await fetch(`/api/schedule_data/${currentYear}/${currentMonth}`); const data = await response.json(); const doctorSchedule = data.submissions[currentDoctor] || { days_off: [], submitted: false }; holidays = data.holidays || []; renderCalendar(doctorSchedule.days_off); setCalendarMode(doctorSchedule.submitted); } function renderCalendar(selectedDays) { calendarDiv.innerHTML = ''; calendarTitle.textContent = `${currentYear} 年 ${currentMonth} 月`; const daysInMonth = new Date(currentYear, currentMonth, 0).getDate(); const firstDayOfMonth = new Date(currentYear, currentMonth - 1, 1).getDay(); const dayHeaders = ['日', '一', '二', '三', '四', '五', '六']; dayHeaders.forEach(h => { const el = document.createElement('div'); el.className = 'calendar-day header'; el.textContent = h; calendarDiv.appendChild(el); }); for (let i = 0; i < firstDayOfMonth; i++) { const el = document.createElement('div'); el.className = 'calendar-day other-month'; calendarDiv.appendChild(el); } for (let day = 1; day <= daysInMonth; day++) { const dayEl = document.createElement('div'); dayEl.className = 'calendar-day available'; dayEl.textContent = day; dayEl.dataset.day = day; if (holidays.includes(day)) dayEl.classList.add('holiday'); const dayOfWeek = new Date(currentYear, currentMonth - 1, day).getDay(); if (dayOfWeek === 0 || dayOfWeek === 6) dayEl.classList.add('weekend'); if (selectedDays.includes(day)) dayEl.classList.add('selected'); calendarDiv.appendChild(dayEl); } updatePointsCount(); } function setCalendarMode(isReadOnly) { isCalendarReadOnly = isReadOnly; calendarDiv.classList.toggle('is-readonly', isReadOnly); submittedInfo.classList.toggle('d-none', !isReadOnly); submitBtn.classList.toggle('d-none', isReadOnly); modifyBtn.classList.toggle('d-none', !isReadOnly); } function updatePointsCount() { let totalPoints = 0; calendarDiv.querySelectorAll('.calendar-day.selected').forEach(dayEl => { if (dayEl.classList.contains('weekend') || dayEl.classList.contains('holiday')) { totalPoints += 2; } else { totalPoints += 1; } }); pointsDisplay.textContent = totalPoints; pointsWarning.classList.toggle('d-none', totalPoints <= 4); } async function submitDaysOff() { const daysOff = Array.from(calendarDiv.querySelectorAll('.selected')).map(el => parseInt(el.dataset.day)); submitBtn.disabled = true; submitBtn.innerHTML = `<span class="spinner-border spinner-border-sm"></span> 儲存中...`; try { const response = await fetch('/api/submit_days_off', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ doctor: currentDoctor, year: currentYear, month: currentMonth, daysOff }) }); const result = await response.json(); alert(result.status === 'success' ? '預休日期已成功儲存！' : `儲存失敗：${result.message}`); if(result.status === 'success') { setCalendarMode(true); } } catch (error) { alert('提交時發生錯誤。'); } finally { submitBtn.disabled = false; submitBtn.innerHTML = `<i class="bi bi-check-circle-fill"></i> 提交本月預休`; } } }
 
-// --- Admin Page Logic (v2.9.0) ---
+// --- Admin Page Logic (v2.10.0) ---
 function initAdminPage() {
     const yearSelect = document.getElementById('admin-year-select');
     const monthSelect = document.getElementById('admin-month-select');
     const loadTemplateBtn = document.getElementById('load-template-btn');
     const clearMonthBtn = document.getElementById('clear-month-btn');
-    const addDoctorBtn = document.getElementById('add-doctor-btn');
     const saveSettingsBtn = document.getElementById('save-settings-btn');
     const runButton = document.getElementById('run-scheduler-btn');
     const helpText = document.getElementById('run-scheduler-help');
@@ -32,13 +31,10 @@ function initAdminPage() {
     const dateFilter = document.getElementById('date-filter');
     const resetFiltersBtn = document.getElementById('reset-filters-btn');
     const areaLists = { A: document.getElementById('doctor-list-A'), B: document.getElementById('doctor-list-B'), C: document.getElementById('doctor-list-C'), I: document.getElementById('doctor-list-I') };
-    
-    // 【主要修改處】新增對 Modal 的引用
     const addDoctorModal = new bootstrap.Modal(document.getElementById('add-doctor-modal'));
     const newDoctorNameInput = document.getElementById('new-doctor-name');
     const newDoctorAreaSelect = document.getElementById('new-doctor-area');
     const saveNewDoctorBtn = document.getElementById('save-new-doctor-btn');
-
     let currentYear = new Date().getFullYear();
     let currentMonth = new Date().getMonth() + 1;
     let eventSource = null, logTimerInterval = null, fullScheduleData = null;
@@ -53,22 +49,16 @@ function initAdminPage() {
     loadTemplateBtn.addEventListener('click', () => { if (confirm("這將會用預設的醫師資料覆蓋目前的醫師設定，確定要載入嗎？")) { loadTemplateData(); } });
     clearMonthBtn.addEventListener('click', async () => { if (confirm(`這將會永久刪除 ${currentYear} 年 ${currentMonth} 月的所有資料，確定要清空嗎？`)) { try { const response = await fetch('/api/clear_month_data', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ year: currentYear, month: currentMonth }) }); const result = await response.json(); alert(result.message); if (result.status === 'success') { loadDoctorSettings(); } } catch (error) { alert('清除資料時發生錯誤。'); } } });
     
-    // 【主要修改處】按鈕現在只負責顯示 Modal
-    // addDoctorBtn.addEventListener('click', ...); // 此按鈕現在由 data-bs-toggle 控制
-
     saveNewDoctorBtn.addEventListener('click', () => {
         const name = newDoctorNameInput.value.trim();
         const area = newDoctorAreaSelect.value;
-        if (!name) {
-            alert('醫師姓名不可為空！');
-            return;
-        }
+        if (!name) { alert('醫師姓名不可為空！'); return; }
         const template = doctorTemplate[name] || {};
         const newRowData = { name: name, data: { days_off: [], area: area, points_limit: template.points_limit || 8, submitted: false } };
         renderDoctorItem(newRowData);
         sortAreaList(areaLists[area]);
-        addDoctorModal.hide(); // 隱藏 modal
-        newDoctorNameInput.value = ''; // 清空輸入框
+        addDoctorModal.hide();
+        newDoctorNameInput.value = '';
     });
 
     saveSettingsBtn.addEventListener('click', saveDoctorSettings);
@@ -78,19 +68,23 @@ function initAdminPage() {
     [areaFilter, dateFilter].forEach(el => el.addEventListener('change', applyTableFilters));
     resetFiltersBtn.addEventListener('click', () => { areaFilter.value = 'all'; dateFilter.value = 'all'; applyTableFilters(); });
 
+    // 【主要修改處】
     Object.values(areaLists).forEach(listEl => { 
         new Sortable(listEl, { 
             group: 'doctors', 
             animation: 150, 
             handle: '.drag-handle',
-            // 【主要修改處】拖曳結束後，對來源和目標列表都進行重新排序
+            // 拖曳結束後，對來源和目標列表都進行重新排序
             onEnd: function(evt) {
                 const originList = evt.from;
                 const destinationList = evt.to;
-                sortAreaList(destinationList);
-                if (originList !== destinationList) {
-                    sortAreaList(originList);
-                }
+                // 使用 setTimeout 確保 DOM 更新後再排序
+                setTimeout(() => {
+                    sortAreaList(destinationList);
+                    if (originList !== destinationList) {
+                        sortAreaList(originList);
+                    }
+                }, 0);
             }
         }); 
     });
@@ -131,6 +125,7 @@ function initAdminPage() {
         items.forEach(item => listEl.appendChild(item));
     }
 
+    // 【主要修改處】
     function renderDoctorItem({ name, data }) {
         const area = data.area || 'A';
         const targetList = areaLists[area];
