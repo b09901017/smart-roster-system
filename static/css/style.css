@@ -101,14 +101,14 @@ main { padding-bottom: 40vh; }
 .doctor-list .list-group-item:active { cursor: grabbing; }
 
 .doctor-name { font-weight: 500; flex-grow: 1; flex-shrink: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; font-size: 1rem; }
-.doctor-name.name-len-2 { font-size: 0.9rem; }
-.doctor-name.name-len-3 { font-size: 0.8rem; }
-.doctor-name.name-len-4 { font-size: 0.7rem; }
-.doctor-name.name-len-5 { font-size: 0.6rem; }
+.doctor-name.name-len-2 { font-size: 0.8rem; }
+.doctor-name.name-len-3 { font-size: 0.7rem; }
+.doctor-name.name-len-4 { font-size: 0.6rem; }
+.doctor-name.name-len-5 { font-size: 0.5rem; }
 
 .points-input-wrapper { display: flex; align-items: center; gap: 0.25rem; flex-shrink: 0; }
-.points-input-wrapper .form-label { font-size: 0.8em; margin-bottom: 0; }
-.points-input-wrapper .form-control { width: 50px; text-align: center; }
+.points-input-wrapper .form-label { font-size: 0.5em; margin-bottom: 0; }
+.points-input-wrapper .form-control { width: 30px; text-align: center; }
 
 /* 【主要修改】優化拖曳時的佔位符樣式 */
 .sortable-ghost {
