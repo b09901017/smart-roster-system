@@ -73,10 +73,10 @@ main { padding-bottom: 40vh; }
 .doctor-name.name-len-2 { font-size: 0.9rem; }
 .doctor-name.name-len-3 { font-size: 0.8rem; }
 .doctor-name.name-len-4 { font-size: 0.7rem; }
-.doctor-name.name-len-5 { font-size: 0.6rem; }
-.points-input-wrapper { display: flex; align-items: center; gap: 0.25rem; flex-shrink: 0; }
-.points-input-wrapper .form-label { font-size: 0.8em; margin-bottom: 0; }
-.points-input-wrapper .form-control { width: 50px; text-align: center; }
+.doctor-name.name-len-5 { font-size: 0.5rem; }
+.points-input-wrapper { display: flex; align-items: center; gap: 0.2rem; flex-shrink: 0; }
+.points-input-wrapper .form-label { font-size: 0.5em; margin-bottom: 0; }
+.points-input-wrapper .form-control { width: 45px; text-align: center; }
 .sortable-ghost { background: #c8ebfb; opacity: 0.8; border: 2px dashed #0d6efd; }
 .remove-btn { flex-shrink: 0; }
 #doctor-list-UNCLASSIFIED { display: flex; flex-wrap: wrap; gap: 8px; align-content: flex-start; }
