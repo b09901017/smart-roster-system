@@ -31,39 +31,63 @@ main { padding-bottom: 40vh; }
 .analysis-card-wrapper { display: flex; justify-content: center; }
 .analysis-card-wrapper .card { width: 100%; max-width: 600px; }
 
-/* --- 【主要修改處】卡片式佈局樣式 --- */
-.area-card { min-height: 150px; }
-.area-header { color: white; }
-.area-header-A { background-color: #0d6efd; }
-.area-header-B { background-color: #198754; }
-.area-header-C { background-color: #ffc107; color: #343a40 !important; } /* 黃色背景需用深色文字 */
-.area-header-I { background-color: #dc3545; }
+/* --- 【主要修改處】新的卡片式佈局樣式與顏色主題 --- */
+:root {
+    --area-a-dark: #4a90e2; /* Cornflower Blue */
+    --area-a-light: #eaf2fb;
+    --area-b-dark: #50e3c2; /* Medium Aqua Marine */
+    --area-b-light: #e8fbf7;
+    --area-c-dark: #f5a623; /* Orange Peel */
+    --area-c-light: #fef6e5;
+    --area-i-dark: #e350a4; /* Cerise */
+    --area-i-light: #fbeaf4;
+}
+
+.area-card { 
+    min-height: 150px; 
+    border-width: 2px;
+    transition: all 0.2s ease-in-out;
+}
+.area-card-A { border-color: var(--area-a-dark); }
+.area-card-B { border-color: var(--area-b-dark); }
+.area-card-C { border-color: var(--area-c-dark); }
+.area-card-I { border-color: var(--area-i-dark); }
+
+.area-header { 
+    color: white; 
+    text-shadow: 1px 1px 2px rgba(0,0,0,0.2);
+}
+.area-header-A { background-color: var(--area-a-dark); }
+.area-header-B { background-color: var(--area-b-dark); }
+.area-header-C { background-color: var(--area-c-dark); }
+.area-header-I { background-color: var(--area-i-dark); }
 
 .doctor-list .list-group-item {
     display: flex;
     align-items: center;
-    padding: 0.5rem 0.75rem;
+    padding: 0.75rem;
+    border: none; /* 移除項目間的分隔線 */
+    border-bottom: 1px solid #eee; /* 用更細的線條取代 */
 }
+/* 同色系背景 */
+.area-card-A .list-group-item { background-color: var(--area-a-light); }
+.area-card-B .list-group-item { background-color: var(--area-b-light); }
+.area-card-C .list-group-item { background-color: var(--area-c-light); }
+.area-card-I .list-group-item { background-color: var(--area-i-light); }
+
 .doctor-list-item-content {
     flex-grow: 1;
     display: flex;
     align-items: center;
     gap: 0.75rem;
 }
-.drag-handle { cursor: grab; font-size: 1.2rem; color: #6c757d; padding-right: 0.5rem;}
+.drag-handle { cursor: grab; font-size: 1.3rem; color: #999; padding-right: 0.5rem;}
 .doctor-list .list-group-item:active { cursor: grabbing; }
-.doctor-name { font-weight: 500; flex-basis: 60px; flex-shrink: 0; }
+.doctor-name { font-weight: 500; font-size: 1.05rem; flex-basis: 70px; flex-shrink: 0; }
 .points-input-wrapper { display: flex; align-items: center; gap: 0.25rem; }
-.points-input-wrapper .form-control { width: 70px; text-align: center; }
-.sortable-ghost { background: #e9ecef; opacity: 0.5; }
+.points-input-wrapper .form-control { width: 75px; text-align: center; }
+.sortable-ghost { background: #d6eaff; opacity: 0.7; border-radius: .25rem;}
 .remove-btn { flex-shrink: 0; }
-.days-off-info {
-    font-size: 0.8rem;
-    color: #6c757d;
-    margin-top: -2px; /* 微調使其更靠近醫師姓名 */
-}
-.days-off-info .bi-check-circle-fill { color: #198754; }
-.days-off-info .bi-x-circle-fill { color: #dc3545; }
 
 
 /* --- (其餘樣式與之前相同) --- */
