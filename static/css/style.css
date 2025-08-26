@@ -31,11 +31,24 @@ main { padding-bottom: 40vh; }
 .analysis-card-wrapper { display: flex; justify-content: center; }
 .analysis-card-wrapper .card { width: 100%; max-width: 600px; }
 
-/* --- 【修復】提高優先級以正確顯示顏色 --- */
-.table-hover > tbody > tr.area-A:hover, .area-A { background-color: rgba(173, 216, 230, 0.4) !important; }
-.table-hover > tbody > tr.area-B:hover, .area-B { background-color: rgba(144, 238, 144, 0.4) !important; }
-.table-hover > tbody > tr.area-C:hover, .area-C { background-color: rgba(255, 255, 224, 0.6) !important; }
-.table-hover > tbody > tr.area-I:hover, .area-I { background-color: rgba(255, 182, 193, 0.4) !important; }
+/* --- 【主要修改處】針對醫師設定表格，提高選擇器優先級以確保顏色能正確顯示 --- */
+#doctor-settings-tbody tr.area-A,
+#doctor-settings-table.table-hover > tbody > tr.area-A:hover {
+    background-color: rgba(173, 216, 230, 0.5); /* A 區: 淡藍色 */
+}
+#doctor-settings-tbody tr.area-B,
+#doctor-settings-table.table-hover > tbody > tr.area-B:hover {
+    background-color: rgba(144, 238, 144, 0.5); /* B 區: 淡綠色 */
+}
+#doctor-settings-tbody tr.area-C,
+#doctor-settings-table.table-hover > tbody > tr.area-C:hover {
+    background-color: rgba(255, 255, 224, 0.7); /* C 區: 淡黃色 */
+}
+#doctor-settings-tbody tr.area-I,
+#doctor-settings-table.table-hover > tbody > tr.area-I:hover {
+    background-color: rgba(255, 182, 193, 0.5); /* I 區: 淡粉色 */
+}
+
 
 .schedule-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
 .schedule-table th, .schedule-table td { border: 1px solid #dee2e6; text-align: center; vertical-align: middle; padding: 0.35rem; min-width: 40px; height: 40px; }

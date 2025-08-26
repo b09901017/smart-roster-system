@@ -183,7 +183,17 @@ def run_scheduler_endpoint():
                     yield f"event: DONE\ndata: {json.dumps(error_result)}\n\n"
                     break
                 elif isinstance(log_entry, str): yield f"data: {log_entry}\n\n"
+        
         threading.Thread(target=solve_schedule_web, args=(doctor_data_for_scheduler, year, month, q, OUTPUT_DIR)).start()
-        return Response(event_stream(), mimetype='text/event-stream')
+        
+        # 【主要修改處】
+        # 建立一個 Response 物件，並手動添加標頭來禁用緩衝
+        response = Response(event_stream(), mimetype='text/event-stream')
+        response.headers['X-Accel-Buffering'] = 'no' # 針對 Nginx
+        response.headers['Cache-Control'] = 'no-cache' # 通用標頭
+        return response
+
     except Exception as e:
-        return Response(f"event: DONE\ndata: {json.dumps({'status': 'error', 'message': f'API 內部錯誤: {e}'})}\n\n", mimetype='text/event-stream')
+        # 這個錯誤回應也需要 text/event-stream 格式才能被前端正確解析
+        error_payload = json.dumps({'status': 'error', 'message': f'API 內部嚴重錯誤: {e}'})
+        return Response(f"event: DONE\ndata: {error_payload}\n\n", mimetype='text/event-stream')
