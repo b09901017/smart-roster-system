@@ -69,10 +69,10 @@ main { padding-bottom: 40vh; }
     font-size: 1rem; /* 預設大小 */
 }
 /* 根據字數調整字體大小 */
-.doctor-name.name-len-2 { font-size: 0.8rem; }
-.doctor-name.name-len-3 { font-size: 0.6rem; }
-.doctor-name.name-len-4 { font-size: 0.4rem; }
-.doctor-name.name-len-5 { font-size: 0.2rem; }
+.doctor-name.name-len-2 { font-size: 0.9rem; }
+.doctor-name.name-len-3 { font-size: 0.8rem; }
+.doctor-name.name-len-4 { font-size: 0.7rem; }
+.doctor-name.name-len-5 { font-size: 0.6rem; }
 
 .points-input-wrapper { display: flex; align-items: center; gap: 0.25rem; flex-shrink: 0; }
 .points-input-wrapper .form-label { font-size: 0.8em; margin-bottom: 0; }
