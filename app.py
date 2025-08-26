@@ -1,5 +1,5 @@
 # --------------------------------------------------------------------------
-# 智慧排班系統 - Flask 網頁應用程式 (v2.7.0 - Real-time Add Doctor)
+# 智慧排班系統 - Flask 網頁應用程式 (v2.7.1 - Update Template)
 # --------------------------------------------------------------------------
 
 import gevent.monkey
@@ -47,27 +47,28 @@ def load_data(file_path, default_factory=None):
 def initialize_doctor_template():
     global DOCTOR_TEMPLATE
     if not os.path.exists(DOCTOR_TEMPLATE_FILE):
+        # 【主要修改】更新預設的醫師測試資料
         csv_data = """醫師姓名,區域,點數上限,不可排班日
 如,A,8,"26,27"
 秀,A,8,"1,2,5,6"
-橋,A,6,"1,2,3,4"
+橋,A,6,"1,2,3,4,5,6,7,8,9,19,20"
 君,A,6,"4"
 翔,A,6,"1,3,4"
-航,A,8,"1,14,15,16"
+航,A,8,"1,14,15,16,17,18,19,20"
 淇,B,8,"1,2,25,28"
 慈,B,8,"3,4"
 恩,B,8,""
 屹,B,8,"4,5"
 軒,B,6,"2,3,5"
 佑,C,8,""
-翰,C,6,"1,2,3,4"
-潔,C,5,"16,17,18,19"
-諺,C,5,"1,2,3,4"
+翰,C,6,"1,2,3,4,5,6,7,8,9,13,27"
+潔,C,5,"16,17,18,19,20,21,22,23,24,25,26,27,28,29,30"
+諺,C,5,"1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,26"
 宣,C,8,"26,27"
-韶,C,8,"2,3,4,5"
-然,I,8,"1,2,3,4"
+韶,C,8,"2,3,4,5,6,7,8"
+然,I,8,"1,2,3,4,5,6"
 偉,I,8,"1,2,4,5"
-煒,I,7,"21,22,23,24"
+煒,I,7,"21,22,23,24,25,26,27,28,29,30"
 """
         df = pd.read_csv(io.StringIO(csv_data)).apply(lambda x: x.str.strip() if x.dtype == "object" else x)
         for _, row in df.iterrows():
@@ -124,7 +125,6 @@ def submit_days_off():
     save_data(DOCTOR_SCHEDULE_SUBMISSIONS, DATA_FILE)
     return jsonify({'status': 'success', 'message': f'{doc_name} 於 {month_key} 的預休已提交。'})
 
-# 【主要修改】新增一個專門用來即時新增醫師的 API
 @app.route('/api/add_doctor', methods=['POST'])
 def add_doctor():
     data = request.json
@@ -136,29 +136,18 @@ def add_doctor():
         return jsonify({'status': 'error', 'message': f'醫師 {doc_name} 已存在於本月名單中'}), 400
     
     template = DOCTOR_TEMPLATE.get(doc_name, {})
-    new_doctor_data = {
-        "area": area,
-        "points_limit": template.get("points_limit", 8),
-        "days_off": [],
-        "submitted": False, # 手動新增的醫師預設為未提交
-        "is_template": False
-    }
+    new_doctor_data = { "area": area, "points_limit": template.get("points_limit", 8), "days_off": [], "submitted": False, "is_template": False }
     DOCTOR_SCHEDULE_SUBMISSIONS[month_key][doc_name] = new_doctor_data
     save_data(DOCTOR_SCHEDULE_SUBMISSIONS, DATA_FILE)
-    
     return jsonify({'status': 'success', 'message': f'醫師 {doc_name} 已成功新增至 {month_key}。', 'new_doctor_data': new_doctor_data})
 
 @app.route('/api/update_doctor_settings', methods=['POST'])
 def update_doctor_settings():
     data = request.json; year, month, settings = data.get('year'), data.get('month'), data.get('settings', {}); month_key = get_month_key(year, month)
-    
-    # 判斷 settings 是否為空物件，來決定是覆蓋還是清空
     if not settings:
-        if month_key in DOCTOR_SCHEDULE_SUBMISSIONS:
-            del DOCTOR_SCHEDULE_SUBMISSIONS[month_key]
+        if month_key in DOCTOR_SCHEDULE_SUBMISSIONS: del DOCTOR_SCHEDULE_SUBMISSIONS[month_key]
     else:
         DOCTOR_SCHEDULE_SUBMISSIONS[month_key] = defaultdict(dict, settings)
-    
     save_data(DOCTOR_SCHEDULE_SUBMISSIONS, DATA_FILE)
     return jsonify({'status': 'success', 'message': '醫師設定已成功儲存！'})
 
