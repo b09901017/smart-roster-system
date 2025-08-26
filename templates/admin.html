@@ -63,7 +63,6 @@
                     </div>
                     <div class="collapse show" id="doctor-settings-collapse">
                         <div class="card-body">
-                            <!-- 【主要修改】將醫師設定容器改為 flexbox，並新增「待分區」卡片 -->
                             <div id="doctor-settings-container">
                                 <div class="unclassified-container mb-4">
                                     <div class="card area-card area-card-UNCLASSIFIED">
@@ -71,7 +70,8 @@
                                             <strong><i class="bi bi-person-plus-fill"></i> 待分區醫師 (新提交)</strong>
                                             <small class="text-white-50">請將醫師拖曳至下方 A/B/C/I 區</small>
                                         </div>
-                                        <div class="list-group list-group-flush doctor-list" data-area="UNCLASSIFIED" id="doctor-list-UNCLASSIFIED">
+                                        <!-- 【主要修改】移除 list-group 和 list-group-flush class -->
+                                        <div class="doctor-list" data-area="UNCLASSIFIED" id="doctor-list-UNCLASSIFIED">
                                             <!-- JS will render unclassified doctors here -->
                                         </div>
                                     </div>

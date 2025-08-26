@@ -90,7 +90,6 @@ main { padding-bottom: 40vh; }
 .area-card-B .list-group-item { background-color: var(--area-b-light); }
 .area-card-C .list-group-item { background-color: var(--area-c-light); }
 .area-card-I .list-group-item { background-color: var(--area-i-light); }
-.area-card-UNCLASSIFIED .list-group-item { background-color: var(--area-unclassified-light); }
 
 .doctor-list-item-content { flex-grow: 1; display: flex; align-items: center; gap: 0.5rem; min-width: 0; }
 .drag-handle { cursor: grab; font-size: 1.3rem; color: #999; padding-right: 0.5rem;}
@@ -99,10 +98,10 @@ main { padding-bottom: 40vh; }
 .doctor-name { font-weight: 500; flex-grow: 1; flex-shrink: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; font-size: 1rem; }
 .doctor-name.name-len-2 { font-size: 0.9rem; }
 .doctor-name.name-len-3 { font-size: 0.8rem; }
-.doctor-name.name-len-4 { font-size: 0.6rem; }
+.doctor-name.name-len-4 { font-size: 0.7rem; }
 .doctor-name.name-len-5 { font-size: 0.5rem; }
 
-.points-input-wrapper { display: flex; align-items: center; gap: 0.25rem; flex-shrink: 0; }
+.points-input-wrapper { display: flex; align-items: center; gap: 0.2rem; flex-shrink: 0; }
 .points-input-wrapper .form-label { font-size: 0.5em; margin-bottom: 0; }
 .points-input-wrapper .form-control { width: 45px; text-align: center; }
 
@@ -120,7 +119,8 @@ main { padding-bottom: 40vh; }
     gap: 8px; /* 標籤之間的間距 */
     align-content: flex-start; /* 確保項目從頂部開始排列 */
 }
-.area-card-UNCLASSIFIED .list-group-item {
+/* 【主要修改】讓 .list-group-item 在待分區容器內表現為標籤 */
+#doctor-list-UNCLASSIFIED .list-group-item {
     width: auto;
     flex-grow: 0;
     padding: 0.3rem 0.6rem;
@@ -128,21 +128,22 @@ main { padding-bottom: 40vh; }
     border: 1px solid var(--area-unclassified-dark);
     box-shadow: none;
     margin-bottom: 0;
+    background-color: var(--area-unclassified-light);
 }
-.area-card-UNCLASSIFIED .doctor-list-item-content {
+#doctor-list-UNCLASSIFIED .doctor-list-item-content {
     gap: 0.3rem;
 }
-.area-card-UNCLASSIFIED .drag-handle {
+#doctor-list-UNCLASSIFIED .drag-handle {
     padding-right: 0.2rem;
     font-size: 1.1rem;
 }
-.area-card-UNCLASSIFIED .remove-btn {
+#doctor-list-UNCLASSIFIED .remove-btn {
     display: none; /* 在待分區時隱藏移除按鈕 */
 }
-.area-card-UNCLASSIFIED .doctor-name {
+#doctor-list-UNCLASSIFIED .doctor-name {
     font-size: 0.9rem !important; /* 統一字體大小，忽略長度變化 */
 }
-.area-card-UNCLASSIFIED .list-group-item:last-child {
+#doctor-list-UNCLASSIFIED .list-group-item:last-child {
     margin-bottom: 0;
 }
 
