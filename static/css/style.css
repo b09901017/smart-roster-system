@@ -33,14 +33,10 @@ main { padding-bottom: 40vh; }
 
 /* --- 卡片式佈局樣式與顏色主題 --- */
 :root {
-    --area-a-dark: #4a90e2; /* Cornflower Blue */
-    --area-a-light: #eaf2fb;
-    --area-b-dark: #50e3c2; /* Medium Aqua Marine */
-    --area-b-light: #e8fbf7;
-    --area-c-dark: #f5a623; /* Orange Peel */
-    --area-c-light: #fef6e5;
-    --area-i-dark: #e350a4; /* Cerise */
-    --area-i-light: #fbeaf4;
+    --area-a-dark: #4a90e2; --area-a-light: #eaf2fb; --area-a-flash: #cde2f8;
+    --area-b-dark: #50e3c2; --area-b-light: #e8fbf7; --area-b-flash: #c6f5ea;
+    --area-c-dark: #f5a623; --area-c-light: #fef6e5; --area-c-flash: #fbe6c1;
+    --area-i-dark: #e350a4; --area-i-light: #fbeaf4; --area-i-flash: #f8d2e8;
 }
 .area-card { min-height: 150px; border-width: 2px; transition: all 0.2s ease-in-out; }
 .area-card-A { border-color: var(--area-a-dark); }
@@ -64,21 +60,35 @@ main { padding-bottom: 40vh; }
 /* 【主要修改處】 */
 .doctor-name {
     font-weight: 500;
-    font-size: 1rem; /* 預設字體大小 */
     flex-grow: 1;
     flex-shrink: 1;
-    white-space: normal; /* 允許多行 */
-    overflow: visible;
-    text-overflow: clip;
+    white-space: nowrap; /* 保持單行 */
+    overflow: hidden;
+    text-overflow: ellipsis; /* 超出部分用 ... 代替 */
     min-width: 0;
-    line-height: 1.2; /* 調整行高以適應換行 */
-    word-break: break-all; /* 強制長單字換行 */
+    font-size: 1rem; /* 預設大小 */
 }
+/* 根據字數調整字體大小 */
+.doctor-name.name-len-3 { font-size: 0.95rem; }
+.doctor-name.name-len-4 { font-size: 0.8rem; }
+.doctor-name.name-len-5 { font-size: 0.7rem; }
+
 .points-input-wrapper { display: flex; align-items: center; gap: 0.25rem; flex-shrink: 0; }
 .points-input-wrapper .form-label { font-size: 0.8em; margin-bottom: 0; }
 .points-input-wrapper .form-control { width: 50px; text-align: center; }
 .sortable-ghost { background: #d6eaff; opacity: 0.7; border-radius: .25rem;}
 .remove-btn { flex-shrink: 0; }
+
+/* 閃爍動畫 */
+@keyframes flash-A { 50% { background-color: var(--area-a-flash); } }
+@keyframes flash-B { 50% { background-color: var(--area-b-flash); } }
+@keyframes flash-C { 50% { background-color: var(--area-c-flash); } }
+@keyframes flash-I { 50% { background-color: var(--area-i-flash); } }
+
+.flash-A { animation: flash-A 0.8s; }
+.flash-B { animation: flash-B 0.8s; }
+.flash-C { animation: flash-C 0.8s; }
+.flash-I { animation: flash-I 0.8s; }
 
 /* --- (其餘樣式與之前相同) --- */
 .schedule-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
