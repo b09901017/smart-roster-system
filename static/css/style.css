@@ -31,7 +31,7 @@ main { padding-bottom: 40vh; }
 .analysis-card-wrapper { display: flex; justify-content: center; }
 .analysis-card-wrapper .card { width: 100%; max-width: 600px; }
 
-/* --- 【主要修改處】新的卡片式佈局樣式與顏色主題 --- */
+/* --- 卡片式佈局樣式與顏色主題 --- */
 :root {
     --area-a-dark: #4a90e2; /* Cornflower Blue */
     --area-a-light: #eaf2fb;
@@ -42,53 +42,31 @@ main { padding-bottom: 40vh; }
     --area-i-dark: #e350a4; /* Cerise */
     --area-i-light: #fbeaf4;
 }
-
-.area-card { 
-    min-height: 150px; 
-    border-width: 2px;
-    transition: all 0.2s ease-in-out;
-}
+.area-card { min-height: 150px; border-width: 2px; transition: all 0.2s ease-in-out; }
 .area-card-A { border-color: var(--area-a-dark); }
 .area-card-B { border-color: var(--area-b-dark); }
 .area-card-C { border-color: var(--area-c-dark); }
 .area-card-I { border-color: var(--area-i-dark); }
-
-.area-header { 
-    color: white; 
-    text-shadow: 1px 1px 2px rgba(0,0,0,0.2);
-}
+.area-header { color: white; text-shadow: 1px 1px 2px rgba(0,0,0,0.2); }
 .area-header-A { background-color: var(--area-a-dark); }
 .area-header-B { background-color: var(--area-b-dark); }
 .area-header-C { background-color: var(--area-c-dark); }
 .area-header-I { background-color: var(--area-i-dark); }
-
-.doctor-list .list-group-item {
-    display: flex;
-    align-items: center;
-    padding: 0.75rem;
-    border: none; /* 移除項目間的分隔線 */
-    border-bottom: 1px solid #eee; /* 用更細的線條取代 */
-}
-/* 同色系背景 */
+.doctor-list .list-group-item { display: flex; align-items: center; padding: 0.75rem; border: none; border-bottom: 1px solid #eee; }
 .area-card-A .list-group-item { background-color: var(--area-a-light); }
 .area-card-B .list-group-item { background-color: var(--area-b-light); }
 .area-card-C .list-group-item { background-color: var(--area-c-light); }
 .area-card-I .list-group-item { background-color: var(--area-i-light); }
 
-.doctor-list-item-content {
-    flex-grow: 1;
-    display: flex;
-    align-items: center;
-    gap: 0.75rem;
-}
+/* 【主要修改處】調整 Flexbox 佈局以修正刪除按鈕位置 */
+.doctor-list-item-content { flex-grow: 1; display: flex; align-items: center; gap: 0.5rem; }
 .drag-handle { cursor: grab; font-size: 1.3rem; color: #999; padding-right: 0.5rem;}
 .doctor-list .list-group-item:active { cursor: grabbing; }
-.doctor-name { font-weight: 500; font-size: 1.05rem; flex-basis: 70px; flex-shrink: 0; }
+.doctor-name { font-weight: 500; font-size: 1.05rem; flex-shrink: 0; margin-right: auto; /* 讓姓名佔據左側所有剩餘空間 */ }
 .points-input-wrapper { display: flex; align-items: center; gap: 0.25rem; }
 .points-input-wrapper .form-control { width: 75px; text-align: center; }
 .sortable-ghost { background: #d6eaff; opacity: 0.7; border-radius: .25rem;}
 .remove-btn { flex-shrink: 0; }
-
 
 /* --- (其餘樣式與之前相同) --- */
 .schedule-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
