@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>管理員儀表板</title>
+    <title>管理員儀表板 v2.15.0</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
@@ -11,47 +11,83 @@
 <body>
     <div class="container-fluid">
         <div class="row">
-            <!-- Sidebar -->
             <nav class="col-md-3 col-lg-2 d-md-block bg-light sidebar collapse">
                 <div class="position-sticky pt-3 sidebar-sticky">
                     <h4 class="sidebar-heading px-3 mt-2 mb-3">管理員儀表板</h4>
-                    <div class="px-3 mb-3">
-                        <a href="/" class="btn btn-outline-secondary w-100"><i class="bi bi-arrow-left-circle"></i> 返回首頁</a>
-                    </div>
+                    <div class="px-3 mb-3"><a href="/" class="btn btn-outline-secondary w-100"><i class="bi bi-arrow-left-circle"></i> 返回首頁</a></div>
                     <hr>
-                    <h6 class="sidebar-heading px-3 mt-4 mb-2 text-muted">排班控制器</h6>
+                    <h6 class="sidebar-heading px-3 mt-4 mb-2 text-muted">排班月份選擇</h6>
                     <div class="px-3">
-                        <div class="mb-2">
-                            <label for="admin-year-select" class="form-label">年份</label>
-                            <select id="admin-year-select" class="form-select"></select>
-                        </div>
-                        <div class="mb-3">
-                            <label for="admin-month-select" class="form-label">月份</label>
-                            <select id="admin-month-select" class="form-select"></select>
-                        </div>
-                        <div class="d-grid">
-                            <button id="run-scheduler-btn" class="btn btn-primary btn-lg" disabled>
-                                <i class="bi bi-calculator-fill"></i> 一鍵排班
-                            </button>
-                        </div>
-                        <small id="run-scheduler-help" class="form-text text-muted d-block mt-2">需所有醫師提交預休後方可啟用。</small>
+                        <div class="mb-2"><label for="admin-year-select" class="form-label">年份</label><select id="admin-year-select" class="form-select"></select></div>
+                        <div class="mb-3"><label for="admin-month-select" class="form-label">月份</label><select id="admin-month-select" class="form-select"></select></div>
                     </div>
                     <hr>
-                    <h6 class="sidebar-heading px-3 mt-4 mb-2 text-muted">
-                        <span id="status-month-title"></span> 預休提交狀態
-                    </h6>
-                    <div id="submission-status-container" class="px-3">
-                        <ul id="submission-status-list" class="list-group list-group-flush">
-                            <!-- JS will populate this -->
-                        </ul>
+                    <div class="px-3">
+                        <div class="d-grid gap-2">
+                             <!-- 【主要修改】移除儲存按鈕 -->
+                            <button id="run-scheduler-btn" class="btn btn-primary btn-lg"><i class="bi bi-calculator-fill"></i> 一鍵排班</button>
+                        </div>
+                        <!-- 【主要修改】更新提示文字 -->
+                        <small id="run-scheduler-help" class="form-text text-muted d-block mt-2">醫師設定會自動儲存。</small>
                     </div>
                 </div>
             </nav>
 
-            <!-- Main content -->
             <main class="col-md-9 col-lg-10 ms-sm-auto px-md-4">
                 <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
-                    <h1 class="h2">排班結果</h1>
+                    <h1 class="h2">總醫師設定面板</h1>
+                    <h3 id="settings-month-title" class="h4 text-muted"></h3>
+                </div>
+
+                <div class="card mb-4 bg-light border-warning">
+                    <div class="card-header d-flex justify-content-between align-items-center bg-warning-subtle">
+                        <span><i class="bi bi-tools"></i> 開發者除錯面板</span>
+                        <button class="btn btn-sm btn-outline-secondary" type="button" data-bs-toggle="collapse" data-bs-target="#debug-panel-collapse" aria-expanded="false" aria-controls="debug-panel-collapse">顯示/隱藏</button>
+                    </div>
+                    <div class="collapse" id="debug-panel-collapse">
+                        <div class="card-body">
+                            <p class="text-muted"><small>此面板僅供開發測試使用，用於快速準備或清除測試資料。</small></p>
+                            <div class="d-flex gap-2">
+                                <button id="load-template-btn" class="btn btn-outline-primary"><i class="bi bi-box-arrow-in-down"></i> 載入預設醫師範本</button>
+                                <button id="clear-month-btn" class="btn btn-outline-danger"><i class="bi bi-trash3-fill"></i> 清空本月所有資料</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card mb-4">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <span><i class="bi bi-people-fill"></i> 醫師分區與點數設定</span>
+                        <button class="btn btn-sm btn-outline-secondary" type="button" data-bs-toggle="collapse" data-bs-target="#doctor-settings-collapse" aria-expanded="true" aria-controls="doctor-settings-collapse">
+                            <i class="bi bi-arrows-collapse"></i> 收合/展開
+                        </button>
+                    </div>
+                    <div class="collapse show" id="doctor-settings-collapse">
+                        <div class="card-body">
+                            <div id="doctor-settings-container">
+                                <div class="unclassified-container mb-4">
+                                    <div class="card area-card area-card-UNCLASSIFIED">
+                                        <div class="card-header area-header area-header-UNCLASSIFIED d-flex justify-content-between align-items-center">
+                                            <strong><i class="bi bi-person-plus-fill"></i> 待分區醫師 (新提交)</strong>
+                                            <small class="text-white-50">請將醫師拖曳至下方 A/B/C/I 區</small>
+                                        </div>
+                                        <div class="doctor-list" data-area="UNCLASSIFIED" id="doctor-list-UNCLASSIFIED">
+                                            <!-- JS will render unclassified doctors here -->
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="classified-container">
+                                    <div class="row">
+                                        <div class="col-lg-6 col-xl-3 mb-4"><div class="card area-card area-card-A"><div class="card-header area-header area-header-A"><strong>A 區醫師</strong></div><div class="list-group list-group-flush doctor-list" data-area="A" id="doctor-list-A"></div></div></div>
+                                        <div class="col-lg-6 col-xl-3 mb-4"><div class="card area-card area-card-B"><div class="card-header area-header area-header-B"><strong>B 區醫師</strong></div><div class="list-group list-group-flush doctor-list" data-area="B" id="doctor-list-B"></div></div></div>
+                                        <div class="col-lg-6 col-xl-3 mb-4"><div class="card area-card area-card-C"><div class="card-header area-header area-header-C"><strong>C 區醫師</strong></div><div class="list-group list-group-flush doctor-list" data-area="C" id="doctor-list-C"></div></div></div>
+                                        <div class="col-lg-6 col-xl-3 mb-4"><div class="card area-card area-card-I"><div class="card-header area-header area-header-I"><strong>I 區醫師</strong></div><div class="list-group list-group-flush doctor-list" data-area="I" id="doctor-list-I"></div></div></div>
+                                    </div>
+                                </div>
+                            </div>
+                             <button class="btn btn-outline-primary btn-sm" id="add-doctor-btn" data-bs-toggle="modal" data-bs-target="#add-doctor-modal"><i class="bi bi-plus-circle"></i> 手動新增醫師</button>
+                        </div>
+                    </div>
                 </div>
 
                 <div class="card mb-4">
@@ -60,95 +96,56 @@
                         <button id="toggle-log-btn" class="btn btn-sm btn-outline-secondary d-none">收合/展開</button>
                     </div>
                     <div class="card-body" id="log-card-body">
-                        <pre id="log-output" class="log-container bg-dark text-white p-3 rounded">請點擊「一鍵排班」開始運算...</pre>
+                        <pre id="log-output" class="log-container bg-dark text-white p-3 rounded">點擊「一鍵排班」開始運算...</pre>
                     </div>
                 </div>
-
                 <div id="results-section" class="d-none">
                     <div class="d-flex justify-content-between align-items-center mb-3">
                         <h3 class="h4">最終結果</h3>
-                        <div>
-                            <button id="fullscreen-btn" class="btn btn-sm btn-outline-primary me-2"><i class="bi bi-arrows-fullscreen"></i> 全螢幕檢視</button>
-                            <a id="download-excel-btn" href="#" class="btn btn-sm btn-success"><i class="bi bi-file-earmark-excel-fill"></i> 下載 Excel</a>
-                        </div>
+                        <div><button id="fullscreen-btn" class="btn btn-sm btn-outline-primary me-2"><i class="bi bi-arrows-fullscreen"></i> 全螢幕檢視</button><a id="download-excel-btn" href="#" class="btn btn-sm btn-success"><i class="bi bi-file-earmark-excel-fill"></i> 下載 Excel</a></div>
                     </div>
-                    
-                    <ul class="nav nav-pills nav-sm" id="resultTabs" role="tablist">
-                        <li class="nav-item" role="presentation"><button class="nav-link active" id="doctor-schedule-tab" data-bs-toggle="tab" data-bs-target="#doctor-schedule" type="button" role="tab">醫師月曆班表</button></li>
-                        <li class="nav-item" role="presentation"><button class="nav-link" id="area-schedule-tab" data-bs-toggle="tab" data-bs-target="#area-schedule" type="button" role="tab">區域班表</button></li>
-                        <li class="nav-item" role="presentation"><button class="nav-link" id="analysis-tab" data-bs-toggle="tab" data-bs-target="#analysis" type="button" role="tab">結果分析</button></li>
-                        <li class="nav-item" role="presentation"><button class="nav-link" id="points-summary-tab" data-bs-toggle="tab" data-bs-target="#points-summary" type="button" role="tab">點數統計</button></li>
-                    </ul>
-
-                    <div class="tab-content pt-3">
-                        <div class="tab-pane fade show active" id="doctor-schedule" role="tabpanel">
-                             <div class="table-wrapper">
-                                 <div class="card">
-                                     <div class="card-body">
-                                         <div id="schedule-filters" class="d-flex justify-content-end align-items-center mb-3">
-                                             <label class="form-label me-2 mb-0">篩選:</label>
-                                             <select id="area-filter" class="form-select form-select-sm me-2" style="width: 120px;">
-                                                 <option value="all">所有區域</option>
-                                                 <option value="A">A 區</option>
-                                                 <option value="B">B 區</option>
-                                                 <option value="C">C 區</option>
-                                                 <option value="I">I 區</option>
-                                             </select>
-                                             <select id="date-filter" class="form-select form-select-sm me-2" style="width: 150px;">
-                                                 <option value="all">所有日期</option>
-                                                 <option value="1-10">1-10 日</option>
-                                                 <option value="11-20">11-20 日</option>
-                                                 <option value="21-end">21-月底</option>
-                                             </select>
-                                             <button id="reset-filters-btn" class="btn btn-sm btn-outline-secondary">重設</button>
-                                         </div>
-                                         <div id="doctor-schedule-render-area" class="table-responsive"></div>
-                                     </div>
-                                 </div>
-                             </div>
-                        </div>
-                        <div class="tab-pane fade" id="area-schedule" role="tabpanel">
-                            <div class="table-wrapper">
-                                <div id="area-schedule-render-area" class="table-responsive"></div>
-                            </div>
-                        </div>
-                        <div class="tab-pane fade" id="analysis" role="tabpanel">
-                            <div class="analysis-card-wrapper">
-                                <div class="card">
-                                    <div class="card-body">
-                                        <h5 class="card-title">最終解評分指標</h5>
-                                        <ul id="final-scores-list" class="list-group list-group-flush"></ul>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="tab-pane fade" id="points-summary" role="tabpanel">
-                            <div class="table-wrapper">
-                                <div class="table-responsive" id="points-summary-html"></div>
-                            </div>
-                        </div>
-                    </div>
+                    <ul class="nav nav-pills nav-sm" id="resultTabs" role="tablist"><li class="nav-item" role="presentation"><button class="nav-link active" id="doctor-schedule-tab" data-bs-toggle="tab" data-bs-target="#doctor-schedule" type="button" role="tab">醫師月曆班表</button></li><li class="nav-item" role="presentation"><button class="nav-link" id="area-schedule-tab" data-bs-toggle="tab" data-bs-target="#area-schedule" type="button" role="tab">區域班表</button></li><li class="nav-item" role="presentation"><button class="nav-link" id="analysis-tab" data-bs-toggle="tab" data-bs-target="#analysis" type="button" role="tab">結果分析</button></li><li class="nav-item" role="presentation"><button class="nav-link" id="points-summary-tab" data-bs-toggle="tab" data-bs-target="#points-summary" type="button" role="tab">點數統計</button></li></ul>
+                    <div class="tab-content pt-3"><div class="tab-pane fade show active" id="doctor-schedule" role="tabpanel"><div class="table-wrapper"><div class="card"><div class="card-body"><div class="d-flex justify-content-between align-items-center mb-3"><div><span class="badge" style="background-color: #D8BFD8; color: black;">跨月休息</span> <span class="badge bg-secondary">預休</span> <span class="badge" style="background-color: #FFDDC1; color: #5f3f00;">假日/國定假日</span></div><div id="schedule-filters" class="d-flex justify-content-end align-items-center"><label class="form-label me-2 mb-0">篩選:</label><select id="area-filter" class="form-select form-select-sm me-2" style="width: 120px;"><option value="all">所有區域</option><option value="A">A 區</option><option value="B">B 區</option><option value="C">C 區</option><option value="I">I 區</option></select><select id="date-filter" class="form-select form-select-sm me-2" style="width: 150px;"><option value="all">所有日期</option><option value="1-10">1-10 日</option><option value="11-20">11-20 日</option><option value="21-end">21-月底</option></select><button id="reset-filters-btn" class="btn btn-sm btn-outline-secondary">重設</button></div></div><div id="doctor-schedule-render-area" class="table-responsive"></div></div></div></div></div><div class="tab-pane fade" id="area-schedule" role="tabpanel"><div class="table-wrapper"><div id="area-schedule-render-area" class="table-responsive"></div></div></div><div class="tab-pane fade" id="analysis" role="tabpanel"><div class="analysis-card-wrapper"><div class="card"><div class="card-body"><h5 class="card-title">最終解評分指標</h5><ul id="final-scores-list" class="list-group list-group-flush"></ul></div></div></div></div><div class="tab-pane fade" id="points-summary" role="tabpanel"><div class="table-wrapper"><div class="table-responsive" id="points-summary-html"></div></div></div></div>
                 </div>
             </main>
         </div>
     </div>
-
-    <!-- Fullscreen Modal -->
-    <div class="modal fade" id="fullscreen-modal" tabindex="-1">
-        <div class="modal-dialog modal-fullscreen">
+    
+    <div class="modal fade" id="fullscreen-modal" tabindex="-1"><div class="modal-dialog modal-fullscreen"><div class="modal-content"><div class="modal-header"><h5 class="modal-title">醫師月曆班表 (全螢幕)</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body"><div id="fullscreen-schedule-render-area" class="table-responsive h-100"></div></div></div></div></div>
+    
+    <div class="modal fade" id="add-doctor-modal" tabindex="-1">
+        <div class="modal-dialog">
             <div class="modal-content">
                 <div class="modal-header">
-                    <h5 class="modal-title">醫師月曆班表 (全螢幕)</h5>
+                    <h5 class="modal-title">手動新增醫師</h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                 </div>
                 <div class="modal-body">
-                    <div id="fullscreen-schedule-render-area" class="table-responsive h-100"></div>
+                    <div class="mb-3">
+                        <label for="new-doctor-name" class="form-label">醫師姓名</label>
+                        <input type="text" class="form-control" id="new-doctor-name" placeholder="請輸入姓名">
+                    </div>
+                    <div class="mb-3">
+                        <label for="new-doctor-area" class="form-label">選擇區域</label>
+                        <select id="new-doctor-area" class="form-select">
+                            <option value="UNCLASSIFIED" selected>待分區</option>
+                            <option value="A">A 區</option>
+                            <option value="B">B 區</option>
+                            <option value="C">C 區</option>
+                            <option value="I">I 區</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                    <button type="button" class="btn btn-primary" id="save-new-doctor-btn">確認新增</button>
                 </div>
             </div>
         </div>
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sortablejs@latest/Sortable.min.js"></script>
     <script src="{{ url_for('static', filename='js/main.js') }}"></script>
 </body>
 </html>

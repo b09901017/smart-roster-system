@@ -2,201 +2,113 @@ body {
     font-family: 'Noto Sans TC', sans-serif;
     background-color: #f8f9fa;
 }
-main {
-    padding-bottom: 40vh; /* Add extra space at the bottom */
-}
+main { padding-bottom: 40vh; }
+.auth-container { background-color: white; max-width: 450px; }
+.sidebar { position: fixed; top: 0; bottom: 0; left: 0; z-index: 100; padding: 0; box-shadow: inset -1px 0 0 rgba(0, 0, 0, .1); }
+.sidebar-sticky { position: relative; height: 100vh; padding-top: .5rem; overflow-x: hidden; overflow-y: auto; }
+.sidebar .nav-link { font-weight: 500; color: #333; }
+.sidebar-heading { font-size: 1.1rem; text-transform: uppercase; color: #555; }
+.calendar-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 5px; user-select: none; }
+.calendar-day { border: 1px solid #e9ecef; padding: 10px; text-align: center; cursor: pointer; border-radius: .25rem; transition: all 0.2s ease-in-out; }
+.calendar-day.header { background-color: #f8f9fa; font-weight: bold; cursor: default; }
+.calendar-day.other-month { background-color: #f8f9fa; color: #adb5bd; cursor: not-allowed; }
+.calendar-day.available:not(.national-holiday):not(.weekend):hover { background-color: #e2e6ea; transform: scale(1.05); }
 
-.auth-container {
-    background-color: white;
-    max-width: 450px;
-}
+/* 【主要修改】區分國定假日和週末的顏色 */
+.calendar-day.national-holiday { background-color: #FFDDC1; color: #5f3f00; }
+.calendar-day.national-holiday:hover { background-color: #ffcdaa; transform: scale(1.05); }
+.calendar-day.weekend { background-color: #f5f5f5; }
+.calendar-day.weekend:hover { background-color: #e9e9e9; transform: scale(1.05); }
 
-.sidebar {
-    position: fixed;
-    top: 0;
-    bottom: 0;
-    left: 0;
-    z-index: 100;
-    padding: 0;
-    box-shadow: inset -1px 0 0 rgba(0, 0, 0, .1);
-}
+.calendar-day.selected { background-color: #198754 !important; color: white !important; font-weight: bold; border-color: #198754; }
+.calendar-day.selecting { background-color: #cfe2ff !important; border-color: #9ec5fe; }
+.calendar-grid.is-readonly .calendar-day.available { cursor: not-allowed; color: #6c757d; }
+.calendar-grid.is-readonly .calendar-day.available:hover { transform: none; }
+.calendar-grid.is-readonly .calendar-day.weekend { background-color: #e9ecef; }
+.calendar-grid.is-readonly .calendar-day.national-holiday { background-color: #ffeeda; }
+.calendar-grid.is-readonly .calendar-day.selected { background-color: #6c757d !important; border-color: #6c757d; }
 
-.sidebar-sticky {
-    position: relative;
-    height: 100vh;
-    padding-top: .5rem;
-    overflow-x: hidden;
-    overflow-y: auto;
-}
-
-.sidebar .nav-link {
-    font-weight: 500;
-    color: #333;
-}
-
-.sidebar-heading {
-    font-size: 1.1rem;
-    text-transform: uppercase;
-    color: #555;
-}
-
-/* --- Calendar Styles --- */
-.calendar-grid {
-    display: grid;
-    grid-template-columns: repeat(7, 1fr);
-    gap: 5px;
-    user-select: none;
-}
-
-.calendar-day {
-    border: 1px solid #e9ecef;
-    padding: 10px;
-    text-align: center;
-    cursor: pointer;
-    border-radius: .25rem;
-    transition: all 0.2s ease-in-out;
-}
-
-.calendar-day.header {
-    background-color: #f8f9fa;
-    font-weight: bold;
-    cursor: default;
-}
-
-.calendar-day.other-month {
-    background-color: #f8f9fa;
-    color: #adb5bd;
-    cursor: not-allowed;
-}
-
-.calendar-day.available:not(.holiday):hover {
-    background-color: #e2e6ea;
-    transform: scale(1.05);
-}
-
-.calendar-day.holiday {
-    background-color: #FFDDC1;
-    color: #5f3f00;
-}
-.calendar-day.holiday:hover {
-    background-color: #ffcdaa;
-    transform: scale(1.05);
-}
-
-.calendar-day.selected {
-    background-color: #198754 !important;
-    color: white !important;
-    font-weight: bold;
-    border-color: #198754;
-}
-.calendar-day.selecting {
-    background-color: #cfe2ff !important;
-    border-color: #9ec5fe;
-}
-
-/* --- Admin Page Styles --- */
-#log-card-body {
-    transition: all 0.3s ease-in-out;
-    padding: 1.25rem; /* Bootstrap default card-body padding */
-}
-#log-card-body.minimized {
-    padding: 0 !important;
-    height: 0;
-    overflow: hidden;
-    border: none;
-}
-#log-card-body:not(.minimized) #log-output {
-    height: 300px;
-    overflow-y: auto;
-}
-
-#submission-status-container {
-    max-height: 250px;
-    overflow-y: auto;
-}
-
-#results-section .table-responsive {
-    max-height: 60vh;
-    overflow: auto;
-}
-#fullscreen-schedule-render-area {
-    max-height: none;
-    height: 100%;
-}
-
-/* --- Result Table & Card Styles (Slim & Centered) --- */
-.table-wrapper {
-    display: flex;
-    justify-content: center;
-}
+#log-card-body { transition: all 0.3s ease-in-out; padding: 1.25rem; }
+#log-card-body.minimized { padding: 0 !important; height: 0; overflow: hidden; border: none; }
+#log-card-body:not(.minimized) #log-output { height: 300px; overflow-y: auto; }
+#results-section .table-responsive { max-height: 60vh; overflow: auto; }
+#fullscreen-schedule-render-area { max-height: none; height: 100%; }
+.table-wrapper { display: flex; justify-content: center; }
 .table-wrapper > .table-responsive,
-.table-wrapper > .card {
-    width: auto;
-    max-width: 100%;
-}
-#points-summary-html table,
-#area-schedule-render-area table {
-    width: auto; /* Allow table to shrink to content */
-}
-#points-summary-html table th, #points-summary-html table td,
-#area-schedule-render-area table th, #area-schedule-render-area table td {
-    text-align: center;
-    vertical-align: middle;
-}
-.analysis-card-wrapper {
-    display: flex;
-    justify-content: center;
-}
-.analysis-card-wrapper .card {
-    width: 100%;
-    max-width: 600px;
-}
+.table-wrapper > .card { width: auto; max-width: 100%; }
+.analysis-card-wrapper { display: flex; justify-content: center; }
+.analysis-card-wrapper .card { width: 100%; max-width: 600px; }
 
-/* --- Result Table Visual Styles --- */
-.schedule-table {
-    width: 100%;
-    border-collapse: collapse;
-    font-size: 0.85rem;
+:root {
+    --area-a-dark: #4a90e2; --area-a-light: #eaf2fb; --area-a-flash: #cde2f8;
+    --area-b-dark: #50e3c2; --area-b-light: #e8fbf7; --area-b-flash: #c6f5ea;
+    --area-c-dark: #f5a623; --area-c-light: #fef6e5; --area-c-flash: #fbe6c1;
+    --area-i-dark: #e350a4; --area-i-light: #fbeaf4; --area-i-flash: #f8d2e8;
+    --area-unclassified-dark: #6c757d; --area-unclassified-light: #f8f9fa; --area-unclassified-flash: #e2e6ea;
 }
-.schedule-table th, .schedule-table td {
-    border: 1px solid #dee2e6;
-    text-align: center;
-    vertical-align: middle;
-    padding: 0.35rem;
-    min-width: 40px;
-    height: 40px;
-}
-.schedule-table th {
-    background-color: #e9ecef;
-    position: sticky;
-    top: 0;
-    z-index: 2;
-}
-.schedule-table td:first-child, .schedule-table th:first-child {
-    position: sticky;
-    left: 0;
-    background-color: #f8f9fa;
-    font-weight: bold;
-    z-index: 1;
-    min-width: 75px;
-}
-.schedule-table th:first-child {
-    z-index: 3;
-}
-
+.area-card { min-height: 150px; border-width: 2px; transition: all 0.2s ease-in-out; display: flex; flex-direction: column; }
+.area-card-A { border-color: var(--area-a-dark); }
+.area-card-B { border-color: var(--area-b-dark); }
+.area-card-C { border-color: var(--area-c-dark); }
+.area-card-I { border-color: var(--area-i-dark); }
+.area-card-UNCLASSIFIED { border-color: var(--area-unclassified-dark); border-style: dashed; }
+.area-header { color: white; text-shadow: 1px 1px 2px rgba(0,0,0,0.2); }
+.area-header-A { background-color: var(--area-a-dark); }
+.area-header-B { background-color: var(--area-b-dark); }
+.area-header-C { background-color: var(--area-c-dark); }
+.area-header-I { background-color: var(--area-i-dark); }
+.area-header-UNCLASSIFIED { background-color: var(--area-unclassified-dark); }
+.doctor-list { flex-grow: 1; min-height: 100px; padding: 0.5rem; border-bottom-left-radius: calc(0.375rem - 2px); border-bottom-right-radius: calc(0.375rem - 2px); transition: background-color 0.2s ease; }
+.doctor-list.sortable-drag { background-color: #d6eaff !important; }
+.doctor-list .list-group-item { display: flex; align-items: center; padding: 0.5rem 0.75rem; border: 1px solid #e0e0e0; border-radius: .25rem; margin-bottom: 0.5rem; box-shadow: 0 1px 2px rgba(0,0,0,0.05); }
+.doctor-list .list-group-item:last-child { margin-bottom: 0; }
+.area-card-A .list-group-item { background-color: var(--area-a-light); }
+.area-card-B .list-group-item { background-color: var(--area-b-light); }
+.area-card-C .list-group-item { background-color: var(--area-c-light); }
+.area-card-I .list-group-item { background-color: var(--area-i-light); }
+.doctor-list-item-content { flex-grow: 1; display: flex; align-items: center; gap: 0.5rem; min-width: 0; }
+.drag-handle { cursor: grab; font-size: 1.3rem; color: #999; padding-right: 0.5rem;}
+.doctor-list .list-group-item:active { cursor: grabbing; }
+.doctor-name { font-weight: 500; flex-grow: 1; flex-shrink: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; font-size: 1rem; }
+.doctor-name.name-len-2 { font-size: 0.9rem; }
+.doctor-name.name-len-3 { font-size: 0.8rem; }
+.doctor-name.name-len-4 { font-size: 0.7rem; }
+.doctor-name.name-len-5 { font-size: 0.5rem; }
+.points-input-wrapper { display: flex; align-items: center; gap: 0.2rem; flex-shrink: 0; }
+.points-input-wrapper .form-label { font-size: 0.5em; margin-bottom: 0; }
+.points-input-wrapper .form-control { width: 45px; text-align: center; }
+.sortable-ghost { background: #c8ebfb; opacity: 0.8; border: 2px dashed #0d6efd; }
+.remove-btn { flex-shrink: 0; }
+#doctor-list-UNCLASSIFIED { display: flex; flex-wrap: wrap; gap: 8px; align-content: flex-start; }
+#doctor-list-UNCLASSIFIED .list-group-item { width: auto; flex-grow: 0; padding: 0.3rem 0.6rem; border-radius: 16px; border: 1px solid var(--area-unclassified-dark); box-shadow: none; margin-bottom: 0; background-color: var(--area-unclassified-light); }
+#doctor-list-UNCLASSIFIED .doctor-list-item-content { gap: 0.3rem; }
+#doctor-list-UNCLASSIFIED .drag-handle { padding-right: 0.2rem; font-size: 1.1rem; }
+#doctor-list-UNCLASSIFIED .remove-btn { display: none; }
+#doctor-list-UNCLASSIFIED .doctor-name { font-size: 0.9rem !important; }
+#doctor-list-UNCLASSIFIED .list-group-item:last-child { margin-bottom: 0; }
+@keyframes flash-A { 50% { background-color: var(--area-a-flash); } }
+@keyframes flash-B { 50% { background-color: var(--area-b-flash); } }
+@keyframes flash-C { 50% { background-color: var(--area-c-flash); } }
+@keyframes flash-I { 50% { background-color: var(--area-i-flash); } }
+@keyframes flash-UNCLASSIFIED { 50% { background-color: var(--area-unclassified-flash); } }
+.flash-A { animation: flash-A 1.5s; }
+.flash-B { animation: flash-B 1.5s; }
+.flash-C { animation: flash-C 1.5s; }
+.flash-I { animation: flash-I 1.5s; }
+.flash-UNCLASSIFIED { animation: flash-UNCLASSIFIED 1.5s; }
+.schedule-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+.schedule-table th, .schedule-table td { border: 1px solid #dee2e6; text-align: center; vertical-align: middle; padding: 0.35rem; min-width: 40px; height: 40px; }
+.schedule-table th { background-color: #e9ecef; position: sticky; top: 0; z-index: 2; }
+.schedule-table td:first-child, .schedule-table th:first-child { position: sticky; left: 0; background-color: #f8f9fa; font-weight: bold; z-index: 1; min-width: 75px; }
+.schedule-table th:first-child { z-index: 3; }
 .cell-weekend { background-color: #F2F2F2; }
 .cell-holiday { background-color: #FFDDC1; }
-.cell-dayoff {
-    background-color: #6c757d;
-    color: white;
-    font-weight: bold;
-}
+.cell-dayoff { background-color: #6c757d; color: white; font-weight: bold; }
+.cell-cross-month-off { background-color: #D8BFD8 !important; color: black !important; font-weight: bold; }
 .cell-area-A { background-color: #ADD8E6; }
 .cell-area-B { background-color: #90EE90; }
 .cell-area-C { background-color: #FFFFE0; }
 .cell-area-I { background-color: #FFB6C1; }
-
-
 #run-scheduler-btn:disabled { cursor: not-allowed; }
 #welcome-message { border: 2px dashed #ced4da; border-radius: 10px; color: #6c757d; margin-top: 5rem; }
 #final-scores-list .list-group-item { display: flex; justify-content: space-between; align-items: center; }
@@ -204,8 +116,6 @@ main {
 #final-scores-list .score-penalty { color: #dc3545; }
 #final-scores-list .score-bonus { color: #198754; }
 #final-scores-list .score-neutral { color: #6c757d; }
-#results-section .nav-pills .nav-link {
-    font-size: 0.9rem;
-}
+#results-section .nav-pills .nav-link { font-size: 0.9rem; }
 #download-excel-btn, #fullscreen-btn, #schedule-filters { display: none; }
 #main-content, #doctor-info-card, #welcome-message, #results-section { transition: opacity 0.5s ease-in-out; }
