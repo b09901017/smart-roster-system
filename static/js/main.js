@@ -49,7 +49,7 @@ function initDoctorPage() {
     async function submitDaysOff() { const daysOff = Array.from(calendarDiv.querySelectorAll('.selected')).map(el => parseInt(el.dataset.day)); submitBtn.disabled = true; submitBtn.innerHTML = `<span class="spinner-border spinner-border-sm"></span> 儲存中...`; try { const response = await fetch('/api/submit_days_off', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ doctor: currentDoctor, year: currentYear, month: currentMonth, daysOff }) }); const result = await response.json(); if(result.status === 'success') { alert('預休日期已成功儲存！'); setCalendarMode(true); } else { alert(`儲存失敗：${result.message}`); } } catch (error) { console.error("Submit error:", error); alert('提交時發生錯誤。'); } finally { submitBtn.disabled = false; submitBtn.innerHTML = `<i class="bi bi-check-circle-fill"></i> 提交本月預休`; } }
 }
 
-// --- Admin Page Logic (v2.15.0 - Auto Save & UI Polish) ---
+// --- Admin Page Logic (v2.15.1 - Bug Fix) ---
 function initAdminPage() {
     const yearSelect = document.getElementById('admin-year-select');
     const monthSelect = document.getElementById('admin-month-select');
@@ -233,13 +233,146 @@ function initAdminPage() {
         item.querySelector('.points-input').addEventListener('change', debouncedSave);
     }
 
-    function runScheduler() { if (eventSource) eventSource.close(); if (logTimerInterval) clearInterval(logTimerInterval); runButton.disabled = true; runButton.innerHTML = `<span class="spinner-border spinner-border-sm"></span> 運算中...`; logCardBody.classList.remove('minimized'); isFirstLog = true; handleLogMessage('正在連接後端排班引擎...'); logTimer.textContent = '0s'; logTimer.classList.remove('bg-success'); logTimer.classList.add('bg-secondary'); const startTime = Date.now(); logTimerInterval = setInterval(() => { logTimer.textContent = formatTime(Date.now() - startTime); }, 1000); const url = `/api/run_scheduler?year=${currentYear}&month=${currentMonth}`; eventSource = new EventSource(url); eventSource.onmessage = e => handleLogMessage(e.data); eventSource.addEventListener('DONE', e => handleDoneEvent(JSON.parse(e.data), startTime)); eventSource.onerror = () => { handleLogMessage('\n與伺服器連線中斷或發生錯誤。'); eventSource.close(); resetRunButton(); }; }
-    function handleDoneEvent(data, startTime) { clearInterval(logTimerInterval); logTimer.innerHTML = `✅ ${formatTime(Date.now() - startTime)}`; logTimer.classList.remove('bg-secondary'); logTimer.classList.add('bg-success'); if (data.status === 'success') { fullScheduleData = data.schedule_data_for_render; displayResults(data); logCardBody.classList.add('minimized'); toggleLogBtn.classList.remove('d-none'); setTimeout(() => resultsSection.scrollIntoView({ behavior: 'smooth' }), 100); } else { handleLogMessage(`\n排班失敗: ${data.message}`); alert(`排班失敗: ${data.message}`); } resetRunButton(); eventSource.close(); }
-    function resetRunButton() { runButton.disabled = false; runButton.innerHTML = '<i class="bi bi-calculator-fill"></i> 一鍵排班'; }
-    function displayResults(data) { resultsSection.classList.remove('d-none'); const scoresList = document.getElementById('final-scores-list'); scoresList.innerHTML = ''; for (const [key, value] of Object.entries(data.final_scores)) { const li = document.createElement('li'); li.classList.add('list-group-item'); const valueClass = key.includes('懲罰') ? (value > 0 ? 'score-penalty' : 'score-bonus') : (key.includes('獎勵') ? (value > 0 ? 'score-bonus' : 'score-penalty') : 'score-neutral'); li.innerHTML = `<span>${key}</span><span class="score-value ${valueClass}">${value}</span>`; scoresList.appendChild(li); } applyTableFilters(); document.getElementById('area-schedule-render-area').innerHTML = data.area_schedule_html; document.getElementById('points-summary-html').innerHTML = data.points_summary_html; const downloadBtn = document.getElementById('download-excel-btn'); downloadBtn.href = data.excel_url; downloadBtn.style.display = 'inline-block'; fullscreenBtn.style.display = 'inline-block'; scheduleFilters.style.display = 'flex'; }
-    function applyTableFilters() { if (!fullScheduleData) return; const mainTable = renderScheduleTable(fullScheduleData); document.getElementById('doctor-schedule-render-area').innerHTML = ''; document.getElementById('doctor-schedule-render-area').appendChild(mainTable); const fullscreenContainer = document.getElementById('fullscreen-schedule-render-area'); fullscreenContainer.innerHTML = ''; fullscreenContainer.appendChild(mainTable.cloneNode(true)); }
-    function renderScheduleTable(data) { const area = areaFilter.value, dateRange = dateFilter.value; const filteredDoctors = data.doctors.filter(doc => area === 'all' || data.doctor_info[doc].區域 === area); let startDay = 1, endDay = data.num_days; if (dateRange === '1-10') endDay = 10; else if (dateRange === '11-20') { startDay = 11; endDay = 20; } else if (dateRange === '21-end') startDay = 21; const table = document.createElement('table'); table.className = 'schedule-table'; const thead = table.createTHead(), headerRow = thead.insertRow(); headerRow.insertCell().textContent = '醫師'; for (let day = startDay; day <= endDay; day++) { const th = document.createElement('th'); th.textContent = day; headerRow.appendChild(th); } const tbody = table.createTBody(); filteredDoctors.forEach(doc => { const row = tbody.insertRow(); row.insertCell().textContent = doc; for (let day = startDay; day <= endDay; day++) { const cell = row.insertCell(); const dayOfWeek = new Date(currentYear, currentMonth - 1, day).getDay(); if (data.holidays.includes(day)) cell.classList.add('cell-holiday'); else if ([0, 6].includes(dayOfWeek)) cell.classList.add('cell-weekend'); if (data.days_off[doc] && data.days_off[doc].includes(day)) { cell.textContent = '預休'; cell.classList.add('cell-dayoff'); } else if (data.schedule[doc] && data.schedule[doc][day]) { const area = data.schedule[doc][day]; cell.textContent = area; cell.classList.add(`cell-area-${area}`); } const docInfo = data.doctor_info[doc]; const lastDutyDay = docInfo.上月班別日; if (lastDutyDay > 0) { const prevMonth = new Date(currentYear, currentMonth - 2, 1); const lastDayOfPrevMonth = new Date(prevMonth.getFullYear(), prevMonth.getMonth() + 1, 0).getDate(); if ((lastDutyDay === lastDayOfPrevMonth && (day === 1 || day === 2)) || (lastDutyDay === lastDayOfPrevMonth - 1 && day === 1)) { cell.classList.add('cell-cross-month-off'); if (!cell.textContent) { cell.textContent = '跨月休'; } } } } }); return table; }
-    function formatTime(ms) { const seconds = Math.floor(ms / 1000); const m = Math.floor(seconds / 60); const s = seconds % 60; return m > 0 ? `${m}m ${s}s` : `${s}s`; }
+    // 【主要修改】將遺失的函式加回來
+    function handleLogMessage(data) {
+        const logOutput = document.getElementById('log-output');
+        if (isFirstLog) {
+            logOutput.textContent = '';
+            isFirstLog = false;
+        }
+        logOutput.textContent += data + '\n';
+        logOutput.scrollTop = logOutput.scrollHeight;
+    }
+
+    function runScheduler() { 
+        if (eventSource) eventSource.close(); 
+        if (logTimerInterval) clearInterval(logTimerInterval); 
+        runButton.disabled = true; 
+        runButton.innerHTML = `<span class="spinner-border spinner-border-sm"></span> 運算中...`; 
+        logCardBody.classList.remove('minimized'); 
+        isFirstLog = true; 
+        handleLogMessage('正在連接後端排班引擎...'); 
+        logTimer.textContent = '0s'; 
+        logTimer.classList.remove('bg-success'); 
+        logTimer.classList.add('bg-secondary'); 
+        const startTime = Date.now(); 
+        logTimerInterval = setInterval(() => { logTimer.textContent = formatTime(Date.now() - startTime); }, 1000); 
+        const url = `/api/run_scheduler?year=${currentYear}&month=${currentMonth}`; 
+        eventSource = new EventSource(url); 
+        eventSource.onmessage = e => handleLogMessage(e.data); 
+        eventSource.addEventListener('DONE', e => handleDoneEvent(JSON.parse(e.data), startTime)); 
+        eventSource.onerror = () => { handleLogMessage('\n與伺服器連線中斷或發生錯誤。'); eventSource.close(); resetRunButton(); }; 
+    }
+
+    function handleDoneEvent(data, startTime) { 
+        clearInterval(logTimerInterval); 
+        logTimer.innerHTML = `✅ ${formatTime(Date.now() - startTime)}`; 
+        logTimer.classList.remove('bg-secondary'); 
+        logTimer.classList.add('bg-success'); 
+        if (data.status === 'success') { 
+            fullScheduleData = data.schedule_data_for_render; 
+            displayResults(data); 
+            logCardBody.classList.add('minimized'); 
+            toggleLogBtn.classList.remove('d-none'); 
+            setTimeout(() => resultsSection.scrollIntoView({ behavior: 'smooth' }), 100); 
+        } else { 
+            handleLogMessage(`\n排班失敗: ${data.message}`); 
+            alert(`排班失敗: ${data.message}`); 
+        } 
+        resetRunButton(); 
+        eventSource.close(); 
+    }
+
+    function resetRunButton() { 
+        runButton.disabled = false; 
+        runButton.innerHTML = '<i class="bi bi-calculator-fill"></i> 一鍵排班'; 
+    }
+
+    function displayResults(data) { 
+        resultsSection.classList.remove('d-none'); 
+        const scoresList = document.getElementById('final-scores-list'); 
+        scoresList.innerHTML = ''; 
+        for (const [key, value] of Object.entries(data.final_scores)) { 
+            const li = document.createElement('li'); 
+            li.classList.add('list-group-item'); 
+            const valueClass = key.includes('懲罰') ? (value > 0 ? 'score-penalty' : 'score-bonus') : (key.includes('獎勵') ? (value > 0 ? 'score-bonus' : 'score-penalty') : 'score-neutral'); 
+            li.innerHTML = `<span>${key}</span><span class="score-value ${valueClass}">${value}</span>`; 
+            scoresList.appendChild(li); 
+        } 
+        applyTableFilters(); 
+        document.getElementById('area-schedule-render-area').innerHTML = data.area_schedule_html; 
+        document.getElementById('points-summary-html').innerHTML = data.points_summary_html; 
+        const downloadBtn = document.getElementById('download-excel-btn'); 
+        downloadBtn.href = data.excel_url; 
+        downloadBtn.style.display = 'inline-block'; 
+        fullscreenBtn.style.display = 'inline-block'; 
+        scheduleFilters.style.display = 'flex'; 
+    }
+
+    function applyTableFilters() { 
+        if (!fullScheduleData) return; 
+        const mainTable = renderScheduleTable(fullScheduleData); 
+        document.getElementById('doctor-schedule-render-area').innerHTML = ''; 
+        document.getElementById('doctor-schedule-render-area').appendChild(mainTable); 
+        const fullscreenContainer = document.getElementById('fullscreen-schedule-render-area'); 
+        fullscreenContainer.innerHTML = ''; 
+        fullscreenContainer.appendChild(mainTable.cloneNode(true)); 
+    }
+
+    function renderScheduleTable(data) { 
+        const area = areaFilter.value, dateRange = dateFilter.value; 
+        const filteredDoctors = data.doctors.filter(doc => area === 'all' || data.doctor_info[doc].區域 === area); 
+        let startDay = 1, endDay = data.num_days; 
+        if (dateRange === '1-10') endDay = 10; 
+        else if (dateRange === '11-20') { startDay = 11; endDay = 20; } 
+        else if (dateRange === '21-end') startDay = 21; 
+        const table = document.createElement('table'); 
+        table.className = 'schedule-table'; 
+        const thead = table.createTHead(), headerRow = thead.insertRow(); 
+        headerRow.insertCell().textContent = '醫師'; 
+        for (let day = startDay; day <= endDay; day++) { 
+            const th = document.createElement('th'); 
+            th.textContent = day; 
+            headerRow.appendChild(th); 
+        } 
+        const tbody = table.createTBody(); 
+        filteredDoctors.forEach(doc => { 
+            const row = tbody.insertRow(); 
+            row.insertCell().textContent = doc; 
+            for (let day = startDay; day <= endDay; day++) { 
+                const cell = row.insertCell(); 
+                const dayOfWeek = new Date(currentYear, currentMonth - 1, day).getDay(); 
+                if (data.holidays.includes(day)) cell.classList.add('cell-holiday'); 
+                else if ([0, 6].includes(dayOfWeek)) cell.classList.add('cell-weekend'); 
+                if (data.days_off[doc] && data.days_off[doc].includes(day)) { 
+                    cell.textContent = '預休'; 
+                    cell.classList.add('cell-dayoff'); 
+                } else if (data.schedule[doc] && data.schedule[doc][day]) { 
+                    const area = data.schedule[doc][day]; 
+                    cell.textContent = area; 
+                    cell.classList.add(`cell-area-${area}`); 
+                } 
+                const docInfo = data.doctor_info[doc]; 
+                const lastDutyDay = docInfo.上月班別日; 
+                if (lastDutyDay > 0) { 
+                    const prevMonth = new Date(currentYear, currentMonth - 2, 1); 
+                    const lastDayOfPrevMonth = new Date(prevMonth.getFullYear(), prevMonth.getMonth() + 1, 0).getDate(); 
+                    if ((lastDutyDay === lastDayOfPrevMonth && (day === 1 || day === 2)) || (lastDutyDay === lastDayOfPrevMonth - 1 && day === 1)) { 
+                        cell.classList.add('cell-cross-month-off'); 
+                        if (!cell.textContent) { cell.textContent = '跨月休'; } 
+                    } 
+                } 
+            } 
+        }); 
+        return table; 
+    }
+
+    function formatTime(ms) { 
+        const seconds = Math.floor(ms / 1000); 
+        const m = Math.floor(seconds / 60); 
+        const s = seconds % 60; 
+        return m > 0 ? `${m}m ${s}s` : `${s}s`; 
+    }
     
     loadDoctorSettings();
 }
