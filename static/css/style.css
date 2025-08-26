@@ -31,27 +31,42 @@ main { padding-bottom: 40vh; }
 .analysis-card-wrapper { display: flex; justify-content: center; }
 .analysis-card-wrapper .card { width: 100%; max-width: 600px; }
 
-/* --- 【主要修改處】改為使用左側邊框來標示區域，更穩定且不易被覆蓋 --- */
-#doctor-settings-tbody tr {
-    /* 為所有行添加一個透明的預設邊框，確保切換時佈局不會跳動 */
-    border-left: 5px solid transparent;
-    transition: border-left-color 0.3s ease-in-out; /* 添加一個平滑的過渡效果 */
-}
+/* --- 【主要修改處】卡片式佈局樣式 --- */
+.area-card { min-height: 150px; }
+.area-header { color: white; }
+.area-header-A { background-color: #0d6efd; }
+.area-header-B { background-color: #198754; }
+.area-header-C { background-color: #ffc107; color: #343a40 !important; } /* 黃色背景需用深色文字 */
+.area-header-I { background-color: #dc3545; }
 
-#doctor-settings-tbody tr.area-A {
-    border-left-color: #0d6efd; /* A 區: Bootstrap Primary Blue */
+.doctor-list .list-group-item {
+    display: flex;
+    align-items: center;
+    padding: 0.5rem 0.75rem;
 }
-#doctor-settings-tbody tr.area-B {
-    border-left-color: #198754; /* B 區: Bootstrap Success Green */
+.doctor-list-item-content {
+    flex-grow: 1;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
 }
-#doctor-settings-tbody tr.area-C {
-    border-left-color: #ffc107; /* C 區: Bootstrap Warning Yellow */
+.drag-handle { cursor: grab; font-size: 1.2rem; color: #6c757d; padding-right: 0.5rem;}
+.doctor-list .list-group-item:active { cursor: grabbing; }
+.doctor-name { font-weight: 500; flex-basis: 60px; flex-shrink: 0; }
+.points-input-wrapper { display: flex; align-items: center; gap: 0.25rem; }
+.points-input-wrapper .form-control { width: 70px; text-align: center; }
+.sortable-ghost { background: #e9ecef; opacity: 0.5; }
+.remove-btn { flex-shrink: 0; }
+.days-off-info {
+    font-size: 0.8rem;
+    color: #6c757d;
+    margin-top: -2px; /* 微調使其更靠近醫師姓名 */
 }
-#doctor-settings-tbody tr.area-I {
-    border-left-color: #dc3545; /* I 區: Bootstrap Danger Red */
-}
+.days-off-info .bi-check-circle-fill { color: #198754; }
+.days-off-info .bi-x-circle-fill { color: #dc3545; }
 
 
+/* --- (其餘樣式與之前相同) --- */
 .schedule-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
 .schedule-table th, .schedule-table td { border: 1px solid #dee2e6; text-align: center; vertical-align: middle; padding: 0.35rem; min-width: 40px; height: 40px; }
 .schedule-table th { background-color: #e9ecef; position: sticky; top: 0; z-index: 2; }
@@ -75,7 +90,3 @@ main { padding-bottom: 40vh; }
 #results-section .nav-pills .nav-link { font-size: 0.9rem; }
 #download-excel-btn, #fullscreen-btn, #schedule-filters { display: none; }
 #main-content, #doctor-info-card, #welcome-message, #results-section { transition: opacity 0.5s ease-in-out; }
-#doctor-settings-tbody tr { cursor: grab; }
-#doctor-settings-tbody tr:active { cursor: grabbing; }
-.drag-handle { cursor: grab; font-size: 1.2rem; color: #6c757d; }
-.sortable-ghost { background: #e9ecef; opacity: 0.5; }
