@@ -1,5 +1,5 @@
 # --------------------------------------------------------------------------
-# 智慧排班系統 - Flask 網頁應用程式 (v2.6.1 - Production Ready)
+# 智慧排班系統 - Flask 網頁應用程式 (v2.7.0 - Real-time Add Doctor)
 # --------------------------------------------------------------------------
 
 import gevent.monkey
@@ -116,37 +116,50 @@ def submit_days_off():
     year, month, doc_name = data.get('year'), data.get('month'), data.get('doctor')
     days_off = data.get('daysOff', [])
     month_key = get_month_key(year, month)
-
-    if not doc_name:
-        return jsonify({'status': 'error', 'message': '醫師姓名不可為空'}), 400
-
-    # 【主要修改】如果醫師是第一次提交，為他建立一個預設的紀錄
+    if not doc_name: return jsonify({'status': 'error', 'message': '醫師姓名不可為空'}), 400
     if doc_name not in DOCTOR_SCHEDULE_SUBMISSIONS[month_key]:
-        # 從範本查找是否有預設點數，否則給一個通用預設值
         template = DOCTOR_TEMPLATE.get(doc_name, {})
-        DOCTOR_SCHEDULE_SUBMISSIONS[month_key][doc_name] = {
-            "area": "UNCLASSIFIED",  # 預設為「待分區」
-            "points_limit": template.get("points_limit", 8),
-            "days_off": [],
-            "submitted": False,
-            "is_template": False
-        }
+        DOCTOR_SCHEDULE_SUBMISSIONS[month_key][doc_name] = { "area": "UNCLASSIFIED", "points_limit": template.get("points_limit", 8), "days_off": [], "submitted": False, "is_template": False }
+    DOCTOR_SCHEDULE_SUBMISSIONS[month_key][doc_name].update({ 'days_off': days_off, 'submitted': True, 'is_template': False })
+    save_data(DOCTOR_SCHEDULE_SUBMISSIONS, DATA_FILE)
+    return jsonify({'status': 'success', 'message': f'{doc_name} 於 {month_key} 的預休已提交。'})
 
-    # 更新醫師的預休資料
-    DOCTOR_SCHEDULE_SUBMISSIONS[month_key][doc_name].update({
-        'days_off': days_off,
-        'submitted': True,
-        'is_template': False
-    })
+# 【主要修改】新增一個專門用來即時新增醫師的 API
+@app.route('/api/add_doctor', methods=['POST'])
+def add_doctor():
+    data = request.json
+    year, month, doc_name, area = data.get('year'), data.get('month'), data.get('name'), data.get('area')
+    month_key = get_month_key(year, month)
+    if not all([year, month, doc_name, area]):
+        return jsonify({'status': 'error', 'message': '缺少必要資訊'}), 400
+    if doc_name in DOCTOR_SCHEDULE_SUBMISSIONS.get(month_key, {}):
+        return jsonify({'status': 'error', 'message': f'醫師 {doc_name} 已存在於本月名單中'}), 400
+    
+    template = DOCTOR_TEMPLATE.get(doc_name, {})
+    new_doctor_data = {
+        "area": area,
+        "points_limit": template.get("points_limit", 8),
+        "days_off": [],
+        "submitted": False, # 手動新增的醫師預設為未提交
+        "is_template": False
+    }
+    DOCTOR_SCHEDULE_SUBMISSIONS[month_key][doc_name] = new_doctor_data
     save_data(DOCTOR_SCHEDULE_SUBMISSIONS, DATA_FILE)
     
-    return jsonify({'status': 'success', 'message': f'{doc_name} 於 {month_key} 的預休已提交。'})
+    return jsonify({'status': 'success', 'message': f'醫師 {doc_name} 已成功新增至 {month_key}。', 'new_doctor_data': new_doctor_data})
 
 @app.route('/api/update_doctor_settings', methods=['POST'])
 def update_doctor_settings():
     data = request.json; year, month, settings = data.get('year'), data.get('month'), data.get('settings', {}); month_key = get_month_key(year, month)
-    if not settings: return jsonify({'status': 'error', 'message': '沒有設定資料'}), 400
-    DOCTOR_SCHEDULE_SUBMISSIONS[month_key] = defaultdict(dict, settings); save_data(DOCTOR_SCHEDULE_SUBMISSIONS, DATA_FILE)
+    
+    # 判斷 settings 是否為空物件，來決定是覆蓋還是清空
+    if not settings:
+        if month_key in DOCTOR_SCHEDULE_SUBMISSIONS:
+            del DOCTOR_SCHEDULE_SUBMISSIONS[month_key]
+    else:
+        DOCTOR_SCHEDULE_SUBMISSIONS[month_key] = defaultdict(dict, settings)
+    
+    save_data(DOCTOR_SCHEDULE_SUBMISSIONS, DATA_FILE)
     return jsonify({'status': 'success', 'message': '醫師設定已成功儲存！'})
 
 @app.route('/api/run_scheduler')
@@ -162,9 +175,7 @@ def run_scheduler_endpoint():
         prev_month_schedule = DOCTOR_SCHEDULE_SUBMISSIONS.get(prev_month_key, {}).get("final_schedule", {})
         doctor_data_for_scheduler = []
         for name, info in current_month_settings.items():
-            # 【主要修改】跳過特殊鍵值以及尚未被分區的醫師
-            if name == "final_schedule" or info.get('area') == 'UNCLASSIFIED':
-                continue
+            if name == "final_schedule" or info.get('area') == 'UNCLASSIFIED': continue
             last_month_duty_day = 0
             if prev_month_schedule and name in prev_month_schedule:
                 last_day_of_prev_month = prev_month_date.day
@@ -172,10 +183,8 @@ def run_scheduler_endpoint():
                 if str(last_day_of_prev_month) in doc_prev_schedule: last_month_duty_day = last_day_of_prev_month
                 elif str(last_day_of_prev_month - 1) in doc_prev_schedule: last_month_duty_day = last_day_of_prev_month - 1
             doctor_data_for_scheduler.append({'醫師姓名': name, '區域': info.get('area', 'A'), '點數上限': info.get('points_limit', 8), '不可排班日': info.get('days_off', []), '上月班別日': last_month_duty_day})
-        
         if not doctor_data_for_scheduler:
              return Response(f"event: DONE\ndata: {json.dumps({'status': 'error', 'message': '沒有已完成分區設定的醫師，無法排班。'})}\n\n", mimetype='text/event-stream')
-
         q = Queue()
         def event_stream():
             yield "data: 連線已建立...\n\n"
@@ -201,18 +210,11 @@ def run_scheduler_endpoint():
                     if time.time() - last_heartbeat > 15:
                         yield ": heartbeat\n\n"
                         last_heartbeat = time.time()
-        
         threading.Thread(target=solve_schedule_web, args=(doctor_data_for_scheduler, year, month, q, OUTPUT_DIR)).start()
-        
         response = Response(event_stream(), mimetype='text/event-stream')
         response.headers['X-Accel-Buffering'] = 'no'
         response.headers['Cache-Control'] = 'no-cache'
         return response
-
     except Exception as e:
         error_payload = json.dumps({'status': 'error', 'message': f'API 內部嚴重錯誤: {e}'})
         return Response(f"event: DONE\ndata: {error_payload}\n\n", mimetype='text/event-stream')
-
-# 【主要修改】移除用於本機開發的啟動區塊
-# if __name__ == '__main__':
-#     app.run(debug=True)
