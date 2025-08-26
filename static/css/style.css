@@ -31,22 +31,24 @@ main { padding-bottom: 40vh; }
 .analysis-card-wrapper { display: flex; justify-content: center; }
 .analysis-card-wrapper .card { width: 100%; max-width: 600px; }
 
-/* --- 【主要修改處】針對醫師設定表格，提高選擇器優先級以確保顏色能正確顯示 --- */
-#doctor-settings-tbody tr.area-A,
-#doctor-settings-table.table-hover > tbody > tr.area-A:hover {
-    background-color: rgba(173, 216, 230, 0.5); /* A 區: 淡藍色 */
+/* --- 【主要修改處】改為使用左側邊框來標示區域，更穩定且不易被覆蓋 --- */
+#doctor-settings-tbody tr {
+    /* 為所有行添加一個透明的預設邊框，確保切換時佈局不會跳動 */
+    border-left: 5px solid transparent;
+    transition: border-left-color 0.3s ease-in-out; /* 添加一個平滑的過渡效果 */
 }
-#doctor-settings-tbody tr.area-B,
-#doctor-settings-table.table-hover > tbody > tr.area-B:hover {
-    background-color: rgba(144, 238, 144, 0.5); /* B 區: 淡綠色 */
+
+#doctor-settings-tbody tr.area-A {
+    border-left-color: #0d6efd; /* A 區: Bootstrap Primary Blue */
 }
-#doctor-settings-tbody tr.area-C,
-#doctor-settings-table.table-hover > tbody > tr.area-C:hover {
-    background-color: rgba(255, 255, 224, 0.7); /* C 區: 淡黃色 */
+#doctor-settings-tbody tr.area-B {
+    border-left-color: #198754; /* B 區: Bootstrap Success Green */
 }
-#doctor-settings-tbody tr.area-I,
-#doctor-settings-table.table-hover > tbody > tr.area-I:hover {
-    background-color: rgba(255, 182, 193, 0.5); /* I 區: 淡粉色 */
+#doctor-settings-tbody tr.area-C {
+    border-left-color: #ffc107; /* C 區: Bootstrap Warning Yellow */
+}
+#doctor-settings-tbody tr.area-I {
+    border-left-color: #dc3545; /* I 區: Bootstrap Danger Red */
 }
 
 
