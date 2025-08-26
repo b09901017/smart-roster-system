@@ -40,7 +40,6 @@ main { padding-bottom: 40vh; }
     --area-unclassified-dark: #6c757d; --area-unclassified-light: #f8f9fa; --area-unclassified-flash: #e2e6ea;
 }
 
-/* 【主要修改】讓卡片成為 Flex 容器，為擴大拖曳區做準備 */
 .area-card {
     min-height: 150px;
     border-width: 2px;
@@ -61,22 +60,19 @@ main { padding-bottom: 40vh; }
 .area-header-I { background-color: var(--area-i-dark); }
 .area-header-UNCLASSIFIED { background-color: var(--area-unclassified-dark); }
 
-/* 【主要修改】擴大拖曳區域的核心 */
 .doctor-list {
-    flex-grow: 1; /* 讓列表填滿卡片剩餘空間 */
-    min-height: 100px; /* 關鍵！確保空列表也有足夠的拖曳高度 */
-    padding: 0.5rem; /* 增加內部邊距，讓放置區域更大 */
+    flex-grow: 1; 
+    min-height: 100px; 
+    padding: 0.5rem; 
     border-bottom-left-radius: calc(0.375rem - 2px);
     border-bottom-right-radius: calc(0.375rem - 2px);
     transition: background-color 0.2s ease;
 }
 
-/* 【主要修改】當有東西被拖到這個列表上方時，改變背景色提供視覺回饋 */
 .doctor-list.sortable-drag {
     background-color: #d6eaff !important;
 }
 
-/* 【主要修改】優化醫師卡片外觀 */
 .doctor-list .list-group-item {
     display: flex;
     align-items: center;
@@ -101,22 +97,55 @@ main { padding-bottom: 40vh; }
 .doctor-list .list-group-item:active { cursor: grabbing; }
 
 .doctor-name { font-weight: 500; flex-grow: 1; flex-shrink: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; font-size: 1rem; }
-.doctor-name.name-len-2 { font-size: 0.8rem; }
-.doctor-name.name-len-3 { font-size: 0.7rem; }
-.doctor-name.name-len-4 { font-size: 0.6rem; }
-.doctor-name.name-len-5 { font-size: 0.5rem; }
+.doctor-name.name-len-2 { font-size: 0.9rem; }
+.doctor-name.name-len-3 { font-size: 0.8rem; }
+.doctor-name.name-len-4 { font-size: 0.7rem; }
+.doctor-name.name-len-5 { font-size: 0.6rem; }
 
 .points-input-wrapper { display: flex; align-items: center; gap: 0.25rem; flex-shrink: 0; }
-.points-input-wrapper .form-label { font-size: 0.5em; margin-bottom: 0; }
-.points-input-wrapper .form-control { width: 30px; text-align: center; }
+.points-input-wrapper .form-label { font-size: 0.4em; margin-bottom: 0; }
+.points-input-wrapper .form-control { width: 45px; text-align: center; }
 
-/* 【主要修改】優化拖曳時的佔位符樣式 */
 .sortable-ghost {
     background: #c8ebfb;
     opacity: 0.8;
     border: 2px dashed #0d6efd;
 }
 .remove-btn { flex-shrink: 0; }
+
+/* --- 待分區醫師的特殊樣式 --- */
+#doctor-list-UNCLASSIFIED {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px; /* 標籤之間的間距 */
+    align-content: flex-start; /* 確保項目從頂部開始排列 */
+}
+.area-card-UNCLASSIFIED .list-group-item {
+    width: auto;
+    flex-grow: 0;
+    padding: 0.3rem 0.6rem;
+    border-radius: 16px; /* 藥丸/標籤形狀 */
+    border: 1px solid var(--area-unclassified-dark);
+    box-shadow: none;
+    margin-bottom: 0;
+}
+.area-card-UNCLASSIFIED .doctor-list-item-content {
+    gap: 0.3rem;
+}
+.area-card-UNCLASSIFIED .drag-handle {
+    padding-right: 0.2rem;
+    font-size: 1.1rem;
+}
+.area-card-UNCLASSIFIED .remove-btn {
+    display: none; /* 在待分區時隱藏移除按鈕 */
+}
+.area-card-UNCLASSIFIED .doctor-name {
+    font-size: 0.9rem !important; /* 統一字體大小，忽略長度變化 */
+}
+.area-card-UNCLASSIFIED .list-group-item:last-child {
+    margin-bottom: 0;
+}
+
 
 @keyframes flash-A { 50% { background-color: var(--area-a-flash); } }
 @keyframes flash-B { 50% { background-color: var(--area-b-flash); } }
